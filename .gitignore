@@ -1,0 +1,18 @@
+# Secrets (plan S0, AGENTS.md §14)
+.env
+.env.demo
+.env.test
+
+# Environments and dependencies
+.venv
+node_modules
+
+# Tool caches and build output
+dist/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+test-results/
+playwright-report/
