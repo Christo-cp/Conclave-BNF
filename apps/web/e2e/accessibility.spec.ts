@@ -67,7 +67,7 @@ test.describe('role workspaces', () => {
 
   test('demo controls announce simulated actions', async ({ page }) => {
     await page.addInitScript((accessToken) => localStorage.setItem('conclave_access_token', accessToken), token('demo_controller'))
-    await page.route('**/api/v1/simulation/control', (route) => route.fulfill({ json: { status: 'accepted' } }))
+    await page.route('**/api/v1/admin/simulation/traffic-change', (route) => route.fulfill({ json: { mode: 'SIMULATED' } }))
     await page.goto('/demo')
     await page.getByRole('button', { name: 'TRAFFIC CHANGE' }).click()
     await expect(page.getByRole('status')).toContainText(/TRAFFIC_CHANGE/)

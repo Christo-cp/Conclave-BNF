@@ -41,3 +41,12 @@ def test_hospital_subscription_is_scoped_to_own_hospital():
     user = User(hospital_id=hospital_id, status="ACTIVE", roles=[role])
     assert can_subscribe(user, f"hospital:{hospital_id}")
     assert not can_subscribe(user, f"hospital:{uuid4()}")
+
+
+def test_backend_event_payload_is_metadata_and_consumers_resync_by_entity_id():
+    session = Session(create_engine("sqlite://"))
+    envelope = queue_event(session, "mission.state.changed", "mission-1", 2, {"mission_id": "mission-1", "status": "ARRIVED"})
+    assert envelope.entity_id == "mission-1"
+    assert envelope.payload["status"] == "ARRIVED"
+    assert "mission" not in envelope.payload
+    session.close()

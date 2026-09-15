@@ -56,7 +56,11 @@ class ReservationService:
             ReservationStatus.EXPIRED,
             ReservationStatus.CANCELLED,
         }:
-            resource.available_capacity = (resource.available_capacity or 0) + 1
+            if resource.available_capacity is None:
+                raise ApiError(409, ErrorCode.RESOURCE_UNAVAILABLE, "Resource capacity is unknown.")
+            if resource.reserved_capacity < 1:
+                raise ApiError(409, ErrorCode.RESOURCE_UNAVAILABLE, "Reserved capacity is unavailable.")
+            resource.available_capacity += 1
             resource.reserved_capacity -= 1
         reservation.status = target
         resource.version += 1

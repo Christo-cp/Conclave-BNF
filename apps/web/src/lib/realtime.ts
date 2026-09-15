@@ -1,10 +1,10 @@
 export type RealtimeEvent = {
   event_id: string
   event?: string
-  entity_type?: string
   entity_id?: string
   entity_version?: number
-  data?: unknown
+  mode?: string
+  payload?: Record<string, unknown>
   [key: string]: unknown
 }
 
@@ -66,8 +66,8 @@ export class RealtimeClient {
       if (!event.event_id || this.seen.has(event.event_id)) return
       this.seen.add(event.event_id)
       if (this.seen.size > 500) this.seen.delete(this.seen.values().next().value as string)
-      if (event.entity_type && event.entity_id && typeof event.entity_version === 'number') {
-        const key = `${event.entity_type}:${event.entity_id}`
+      if (event.entity_id && typeof event.entity_version === 'number') {
+        const key = event.entity_id
         const previous = this.versions.get(key) ?? -1
         if (event.entity_version <= previous) return
         if (event.entity_version > previous + 1) void this.resync()

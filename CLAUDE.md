@@ -1,8 +1,8 @@
 # Smart Ambulance Routing & Emergency Bed Allocation — project instructions
 
 Hackathon prototype: real-time coordination of ambulance selection, routing,
-hospital acceptance and transactional resource reservation. On 2026-09-13 this
-folder holds only the six specs — no code and no git repository yet.
+hospital acceptance and transactional resource reservation. The implemented
+surface is S0-S15 with a FastAPI/PostGIS backend and React/Vite frontend.
 
 ## The specs — never read one end to end
 

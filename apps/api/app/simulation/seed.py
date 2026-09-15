@@ -54,7 +54,7 @@ def reset_and_seed(session: Session, settings: Settings) -> None:
     session.add_all(hospital_rows)
     session.flush()
     users = []
-    for role, name, hospital in [(roles[0], "Dispatcher Demo", None), (roles[1], "Crew Demo", None), (roles[2], "Hospital Staff Demo", hospital_rows[2]), (roles[4], "System Admin Demo", None)]:
+    for role, name, hospital in [(roles[0], "Dispatcher Demo", None), (roles[1], "Crew Demo", None), (roles[2], "Hospital Staff Demo", hospital_rows[2]), (roles[4], "System Admin Demo", None), (roles[5], "Demo Controller", None)]:
         user = User(name=name, email=name.lower().replace(" ", ".") + "@demo.invalid", password_hash=ph.hash(PASSWORD), status="ACTIVE", hospital_id=hospital.id if hospital else None, roles=[role])
         users.append(user)
     session.add_all(users)

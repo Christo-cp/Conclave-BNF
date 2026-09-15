@@ -181,6 +181,33 @@ def test_failed_reservation_rolls_back_capacity(capacity_unit):
         assert session.scalar(select(Reservation).where(Reservation.hospital_resource_id == resource_id)) is None
 
 
+def test_releasing_reservation_with_unknown_capacity_is_rejected(capacity_unit):
+    settings, incident_id, hospital_id, resource_id, request_ids = capacity_unit
+    with get_session(settings.database_url)() as session:
+        resource = session.get(HospitalResource, resource_id)
+        assert resource is not None
+        resource.available_capacity = None
+        reservation = _reservation(
+            Incident(id=incident_id),
+            Hospital(id=hospital_id),
+            HospitalResource(id=resource_id),
+            AcceptanceRequest(id=request_ids[0]),
+        )
+        session.add(reservation)
+        session.commit()
+        reservation_id = reservation.id
+
+        with pytest.raises(ApiError) as error:
+            ReservationService(session).release(reservation_id)
+        assert error.value.code == ErrorCode.RESOURCE_UNAVAILABLE
+
+        session.rollback()
+        resource = session.get(HospitalResource, resource_id)
+        assert resource is not None
+        assert resource.available_capacity is None
+        assert session.get(Reservation, reservation_id).status == ReservationStatus.HELD
+
+
 @pytest.mark.parametrize("model, table_name, values", [
     (AuditLog, "audit_logs", {"action": "TEST", "entity_type": "TEST", "entity_id": "x"}),
     (Notification, "notifications", {"event_type": "TEST"}),

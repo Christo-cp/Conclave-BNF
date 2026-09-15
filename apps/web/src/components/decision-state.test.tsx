@@ -10,6 +10,7 @@ describe('CandidateList', () => {
     expect(screen.getByText(/analyzing compatible ambulances/i)).toBeTruthy()
     rerender(<CandidateList title="AVAILABLE FLEET" candidates={[]} state="error" kind="ambulance" onSelect={vi.fn()} />)
     expect(screen.getByText(/matching service unavailable/i)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /select/i })).toBeNull()
     rerender(<CandidateList title="AVAILABLE FLEET" candidates={[]} state="stale" kind="ambulance" onSelect={vi.fn()} />)
     expect(screen.getByText(/showing stale recommendations/i)).toBeTruthy()
     rerender(<CandidateList title="AVAILABLE FLEET" candidates={[candidate]} state="success" kind="ambulance" onSelect={vi.fn()} />)
