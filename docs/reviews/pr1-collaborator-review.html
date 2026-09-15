@@ -1,0 +1,278 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Smart Ambulance PR #1 Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F8FAFC; --surface:#FFFFFF; --panel:#EEF2F7; --text:#0F172A; --muted:#5B6B82; --line:#DCE3EC;
+  --primary:#2563EB; --critical:#DC2626; --warning:#B45309; --success:#15803D; --info:#0E7490; --unknown:#64748B;
+  --critical-bg:#FDECEC; --warning-bg:#FDF3E3; --success-bg:#E8F5EC; --info-bg:#E3F3F6; --unknown-bg:#EDF1F5;
+  --display:"Manrope",system-ui,sans-serif; --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0B1120; --surface:#111827; --panel:#1E293B; --text:#F1F5F9; --muted:#94A3B8; --line:#263245;
+    --primary:#60A5FA; --critical:#F87171; --warning:#FBBF24; --success:#4ADE80; --info:#22D3EE; --unknown:#94A3B8;
+    --critical-bg:#3A1518; --warning-bg:#33260D; --success-bg:#0F2A1A; --info-bg:#0B2A33; --unknown-bg:#1E293B;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B1120; --surface:#111827; --panel:#1E293B; --text:#F1F5F9; --muted:#94A3B8; --line:#263245;
+  --primary:#60A5FA; --critical:#F87171; --warning:#FBBF24; --success:#4ADE80; --info:#22D3EE; --unknown:#94A3B8;
+  --critical-bg:#3A1518; --warning-bg:#33260D; --success-bg:#0F2A1A; --info-bg:#0B2A33; --unknown-bg:#1E293B;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:15px/1.6 var(--body);padding-inline:20px;padding-block:0 64px}
+.wrap{max-width:880px;margin:0 auto}
+header.top{padding-block:40px 28px;border-bottom:1px solid var(--line);display:grid;gap:14px}
+.eyebrow{font:600 11px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+h1{font:800 clamp(28px,4.4vw,38px)/1.15 var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font:700 23px/1.25 var(--display);margin:0 0 14px;text-wrap:balance}
+h3{font:700 17px/1.3 var(--display);margin:0 0 8px}
+p{margin:0 0 12px;max-width:68ch}
+.meta{display:flex;flex-wrap:wrap;gap:6px 22px;color:var(--muted);font-size:13px}
+.meta b{color:var(--text);font-weight:600}
+code,.mono{font-family:var(--mono);font-size:.86em}
+code{background:var(--panel);padding:1px 5px;border-radius:5px;overflow-wrap:anywhere}
+section{padding-block:36px 4px}
+.verdict{margin-top:28px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--critical);border-radius:12px;padding:20px 22px;display:grid;gap:10px}
+.verdict p{margin:0}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:18px}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:2px}
+.fact .n{font:700 26px/1.1 var(--display);font-variant-numeric:tabular-nums}
+.fact .l{font-size:12.5px;color:var(--muted);line-height:1.4}
+.pill{display:inline-block;font:600 10.5px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;padding:5px 8px;border-radius:999px;white-space:nowrap}
+.done{color:var(--success);background:var(--success-bg)}
+.partial{color:var(--warning);background:var(--warning-bg)}
+.stub{color:var(--critical);background:var(--critical-bg)}
+.missing{color:var(--critical);background:var(--critical-bg)}
+.skip{color:var(--unknown);background:var(--unknown-bg)}
+.checked{color:var(--info);background:var(--info-bg)}
+.table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+th{font:600 11px/1.2 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--panel)}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap;font-family:var(--mono);font-size:12.5px}
+td.step{font:700 13px/1.3 var(--display);white-space:nowrap}
+.defects{display:grid;gap:12px;counter-reset:d;padding:0;margin:0;list-style:none}
+.defects li{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px 14px 56px;position:relative;counter-increment:d}
+.defects li::before{content:counter(d);position:absolute;left:18px;top:15px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:700 13px/1 var(--display);color:var(--critical);background:var(--critical-bg)}
+.defects p{margin:4px 0 0;font-size:14px}
+.refs{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:6px;overflow-wrap:anywhere}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.box ul{margin:8px 0 0;padding-left:18px;display:grid;gap:7px;font-size:14px}
+.box.good{border-top:3px solid var(--success)}
+.box.bad{border-top:3px solid var(--warning)}
+.note{font-size:13px;color:var(--muted)}
+.callout{background:var(--info-bg);border-radius:12px;padding:16px 18px;font-size:14px}
+.callout p:last-child{margin:0}
+a{color:var(--primary)}
+a:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+@media (max-width:520px){ th,td{padding:8px 9px} .defects li{padding-left:48px} .defects li::before{left:13px} }
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow">Code review · Smart Ambulance Routing &amp; Emergency Bed Allocation</div>
+  <h1>What PR #1 actually delivered, step by step</h1>
+  <div class="meta">
+    <span>Author <b>Febin</b> (GitHub <span class="mono">febzzz10</span>)</span>
+    <span>Commit <b class="mono">5f05ebf</b> “initial”, merged as <b class="mono">4f893cd</b></span>
+    <span>Reviewed <b>2026-09-15</b> against <span class="mono">docs/executable-plan.md</span> S0–S15</span>
+  </div>
+</header>
+
+<div class="verdict">
+  <div class="eyebrow" style="color:var(--critical)">Bottom line</div>
+  <p><b>A large, fast and structurally sound scaffold, but not a finished S0–S15.</b> The PR laid down the full shape of the system: the data model, services, endpoints, migrations and role screens. Several hard parts are done well, notably row-locked reservations, post-commit event publishing and versioned mission state.</p>
+  <p>But the decisions the product exists to make run on placeholder inputs. The browser flow stops before hospital acceptance. The UI breaks the non-negotiable no-fabrication rule twice: it invents fallback candidates and shows a static “Why selected?” explanation. 5 of the plan’s 109 named tests exist. <code>STATUS.md</code> and <code>docs/dod.md</code> describe the work as more complete than the code is.</p>
+</div>
+
+<div class="facts">
+  <div class="fact"><span class="n">88</span><span class="l">files changed in one commit, +4,775 / −458 lines</span></div>
+  <div class="fact"><span class="n">15</span><span class="l">Alembic migrations (0001–0015), all with downgrades</span></div>
+  <div class="fact"><span class="n">5 / 109</span><span class="l">tests named in the plan’s S0–S15 Tests blocks that exist under that name</span></div>
+  <div class="fact"><span class="n">0 of 16</span><span class="l">build steps with an Exit reproduced here; S0 is closest, S13 legitimately skipped</span></div>
+</div>
+
+<section id="method">
+  <h2>How this was checked</h2>
+  <p>Each step’s Build, Tests and Exit blocks in <code>docs/executable-plan.md</code> were compared with the merged code. Spec requirements were checked through the plan’s line citations. Four independent read-only audits covered S0–S5, S6–S9, S10–S12 and S13–S15 plus rules and process. A fifth re-ran the test suites.</p>
+  <p>The most serious findings were then confirmed by reading the cited lines directly. They are tagged <span class="pill checked">checked in code</span> below. Praise below is for code as written; any test that needs PostgreSQL is marked as not reproduced. A separate, earlier audit by another session (unmerged branch <code>worktree-floofy-meandering-newt</code>) reached the same conclusions on most points. Where the two disagree, this report says so.</p>
+</section>
+
+<section id="credit">
+  <h2>What the collaborator got right</h2>
+  <div class="two">
+    <div class="box good">
+      <h3>Solid engineering worth keeping</h3>
+      <ul>
+        <li><b>Reservations are built to lock correctly.</b> The code uses <code>SELECT … FOR UPDATE</code> on resource rows and a capacity CHECK constraint (<code>0008</code>). A real PostgreSQL test for exactly one winner under concurrency exists but was not reproduced here.</li>
+        <li><b>Events publish only after commit</b> and are dropped on rollback (<code>realtime/broker.py:97-107</code>).</li>
+        <li><b>Mission state is versioned.</b> A stale <code>state_version</code> is rejected, illegal transitions return 409, and EN_ROUTE_TO_HOSPITAL requires a confirmed destination (<code>services.py:293-315</code>).</li>
+        <li><b>Audit tables are append-only</b> by database trigger on <code>audit_logs</code>, <code>mission_events</code>, <code>notifications</code> and <code>resource_events</code>.</li>
+        <li><b>The pure engine filters are correct:</b> unknown capacity is excluded, and a mandatory requirement is never violated (<code>decision_engine/hospital.py:34-44</code>). The service layer fails to pass them stale-reading data, though, so stale capacity still ranks (defect 4).</li>
+        <li><b>Health endpoint, request-ID middleware, Argon2 + JWT login, deterministic tie-breaking</b>, and migrations with downgrades plus a round-trip test (not reproduced here).</li>
+      </ul>
+    </div>
+    <div class="box good">
+      <h3>Good practice in the docs and frontend</h3>
+      <ul>
+        <li><code>docs/measurements.md</code> states plainly that its latency figure covers only the pure matcher, not HTTP, database or browser.</li>
+        <li>The forbidden-claims grep is clean. The slides make no clinical-autonomy claim, and simulated rows carry <code>data_mode="SIMULATED"</code>.</li>
+        <li>No secrets or <code>.env</code> files were committed.</li>
+        <li>The web client dedupes events and reconnects with backoff, then resyncs over REST (<code>lib/realtime.ts:56-61</code>). The Vite proxy is configured and the build and lint are clean.</li>
+        <li>Loading, error, stale and simulated states exist as components, with accessibility-focused Playwright specs.</li>
+        <li>Skipping S13 (ML/voice) matches the plan’s own recommendation.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="matrix">
+  <h2>Step-by-step status</h2>
+  <p class="note">Status judges the code against the step’s Build and Tests blocks, using five labels: Done, Partial, Stub (present but fake or non-functional), Missing and Skipped. No Exit could be fully reproduced without PostgreSQL. “Named tests” counts tests that exist under the plan’s exact name; near-equivalents exist for S7–S10.</p>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Step</th><th>Status</th><th>Named tests</th><th>Main gaps</th></tr></thead>
+    <tbody>
+      <tr><td class="step">S0 Skeleton</td><td><span class="pill partial">Partial</span></td><td class="num">2 / 2</td><td>Build items are present. The health test hard-codes the migration head (<code>test_health.py:33</code>). The database health test was not reproduced.</td></tr>
+      <tr><td class="step">S1 Schema &amp; seed</td><td><span class="pill partial">Partial</span></td><td class="num">0 / 13</td><td>No one-active-mission index, status CHECKs, or append-only triggers on <code>decision_*</code>. The seed doesn’t match A6: no H-007/H-008 cases, no golden incident or MSN-000001, four of six roles.</td></tr>
+      <tr><td class="step">S2 Auth &amp; RBAC</td><td><span class="pill partial">Partial</span></td><td class="num">0 / 3</td><td>Dispatch endpoints have no role check. Logout is a no-op. A missing incident returns 200. <code>test_rbac.py</code> is missing, and every later Exit depends on it.</td></tr>
+      <tr><td class="step">S3 Slice CRUD</td><td><span class="pill partial">Partial</span></td><td class="num">0 / 5</td><td>Optimistic <code>version</code> unchecked on status and resource PATCH. No <code>resource_events</code> or audit rows on those writes. Out-of-plan hard DELETE endpoints added.</td></tr>
+      <tr><td class="step">S4 Ambulance match</td><td><span class="pill stub">Stub</span></td><td class="num">3 / 13</td><td>ETA invented from the unit’s number. Formula deviates from A4. Decisions never persisted. Confirm skips eligibility and the override reason. No heartbeat loop and no crew-accept endpoint.</td></tr>
+      <tr><td class="step">S5 Routing</td><td><span class="pill stub">Stub</span></td><td class="num">0 / 3</td><td>Every route is a constant 6,000 m / 600 s. No provider interface and no fallback chain.</td></tr>
+      <tr><td class="step">S6 Hospital match</td><td><span class="pill stub">Stub</span></td><td class="num">0 / 9</td><td>ETA invented from the hospital code. Three score components fixed. No radius search. Stale and inactive resources not excluded. Rejected hospitals not excluded (BR-009).</td></tr>
+      <tr><td class="step">S7 Acceptance &amp; hold</td><td><span class="pill partial">Partial</span></td><td class="num">0 / 15</td><td>Accept from the UI always returns 409. An expired accept leaks capacity. No automatic request to the rank-1 hospital. Near-equivalent concurrency test targets a different code path.</td></tr>
+      <tr><td class="step">S8 Mission state</td><td><span class="pill partial">Partial</span></td><td class="num">0 / 5</td><td>Core transitions are good. Any user can PATCH any mission. Accept never sets the destination. No golden-slice e2e test.</td></tr>
+      <tr><td class="step">S9 Realtime</td><td><span class="pill stub">Stub</span></td><td class="num">0 / 5</td><td>Not working end to end. The server sends one event per subscribe message. The browser never subscribes. Channel names never match. An empty subscription receives everything.</td></tr>
+      <tr><td class="step">S10 Dispatcher UI</td><td><span class="pill partial">Partial</span></td><td class="num">0 / 3</td><td>Vertical-slice exit not met. The flow stops at route calculation. Fabricated fallback candidates. Static “Why selected?”. Hard-coded intake. No real routes, generated types or design tokens.</td></tr>
+      <tr><td class="step">S11 Other flows</td><td><span class="pill missing">Missing</span></td><td class="num">0 / 11</td><td>No sweeper, crew reject, re-rank on rejection, map or manual coordination. The hospital UI can’t be reached with a real hospital login. Crew and hospital screens are ID text boxes.</td></tr>
+      <tr><td class="step">S12 Reassessment &amp; sim</td><td><span class="pill stub">Stub</span></td><td class="num">0 / 21</td><td>Reassessment only sets a status and has no callers. Resource loss nulls an arbitrary row. No reroute or compare. The demo console calls a route that doesn’t exist.</td></tr>
+      <tr><td class="step">S13 ML &amp; voice</td><td><span class="pill skip">Skipped</span></td><td class="num">n/a</td><td>Skip is allowed. The README doesn’t name FR-023 and FR-032, so the Exit check fails.</td></tr>
+      <tr><td class="step">S14 Hardening</td><td><span class="pill partial">Partial</span></td><td class="num">0 / 1</td><td>No CORS configuration. No audit-completeness test. <code>dod.md</code> cites vague evidence (“RBAC tests in suite”).</td></tr>
+      <tr><td class="step">S15 Demo &amp; pitch</td><td><span class="pill partial">Partial</span></td><td class="num">n/a</td><td>Slides and demo guides exist. <code>.env.demo</code>, <code>golden-run.mp4</code> and the offline map test are missing.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="defects">
+  <h2>The defects that matter most</h2>
+  <p>Ranked by risk to the demo and to the spec’s non-negotiable rules.</p>
+  <ol class="defects">
+    <li><h3>The UI invents data when the API fails <span class="pill checked">checked in code</span></h3>
+      <p>If matching errors, the dispatcher sees hard-coded candidates AMB-002 (score 0.93) and H-003 (0.88). “Why selected?” shows the same static reasons and “ETA 7 min” for every choice. This breaks the rule “never fabricate an available resource”, on the screen judges will watch. It also weakens the only live browser test. That test asserts that AMB-002 and H-003 appear on the page, and the fallback shows exactly those two, so the test can pass even when matching fails.</p>
+      <div class="refs">apps/web/src/App.tsx:35-47, :185-188 · apps/web/e2e/live-golden.spec.ts:13-16</div></li>
+    <li><h3>The golden path cannot finish in the browser <span class="pill checked">checked in code</span></h3>
+      <p>The dispatcher UI never calls <code>createAcceptance</code>. If a hospital accept is sent from the client, the server compares its fresh Idempotency-Key with the key used to <em>create</em> the request, and returns 409. The “live Playwright passed” claim covers a flow that stops at route calculation.</p>
+      <div class="refs">apps/api/app/services.py:261 · apps/web/src/lib/api.ts:40-41 · apps/web/e2e/live-golden.spec.ts</div></li>
+    <li><h3>Rankings run on placeholder numbers <span class="pill checked">checked in code</span></h3>
+      <p>Ambulance ETA is <code>420 + unit number</code> seconds and hospital ETA is <code>600 + code × 60</code>. Every route is 6,000 m / 600 s with confidence 0.95, and three hospital score components are constants. AMB-002 and H-003 win the golden scenario because they have the smallest codes, not because the logic chose them.</p>
+      <div class="refs">services.py:127, :173, :206 · decision_engine/hospital.py:50 · decision_engine/ambulance.py:46-51</div></li>
+    <li><h3>Safety rules are not enforced at the point of action <span class="pill checked">checked in code</span></h3>
+      <p>Confirming an ambulance checks only <code>status == AVAILABLE</code>, so an ambulance missing required equipment or with stale GPS can be dispatched. <code>override_reason</code> is accepted and ignored for non-top picks (BR-010). Hospitals that rejected an incident can be recommended again (BR-009). Hospital matching never passes stale readings to the engine, so stale capacity still ranks as eligible, against the rule never to treat stale data as available.</p>
+      <div class="refs">services.py:144-163 · services.py:193-210</div></li>
+    <li><h3>Authorization gaps <span class="pill checked">checked in code</span></h3>
+      <p>The dispatch router never uses <code>require_roles</code>, so an ambulance crew login can match, confirm and route. Any logged-in user can PATCH any mission. A WebSocket subscription with an empty channel list receives every event.</p>
+      <div class="refs">api/v1/dispatch.py · realtime/websocket.py:30-31 · realtime/broker.py:39-46</div></li>
+    <li><h3>Realtime doesn’t deliver <span class="pill checked">checked in code</span></h3>
+      <p>After one event or heartbeat, the socket loop goes back to waiting for a new subscribe message. The browser client never sends one. Live dashboard updates, a headline feature, don’t happen.</p>
+      <div class="refs">realtime/websocket.py:25-50 · web/src/lib/realtime.ts</div></li>
+    <li><h3>Capacity can leak and failure demos are stubs</h3>
+      <p>Accepting an expired hold marks the request EXPIRED but leaves its reservations HELD, and no background sweeper exists. <code>resource-lost</code> nulls the first resource row in the table. Reassessment is never called. The ICU-failure, rejection and ambulance-failure demo events therefore can’t happen as scripted.</p>
+      <div class="refs">services.py:265-268 · simulation/controls.py:49-56 · reassessment_service.py:11-39</div></li>
+    <li><h3>Role and route mismatches break two screens <span class="pill checked">checked in code</span></h3>
+      <p>The frontend expects role <code>HOSPITAL</code> but the backend issues <code>HOSPITAL_STAFF</code>/<code>HOSPITAL_ADMIN</code>, so hospital users land on the dispatcher view. The demo console posts to <code>/simulation/control</code>, which doesn’t exist, and its test passes only because the call is mocked.</p>
+      <div class="refs">web/src/lib/auth.ts:1,12 · web/src/lib/api.ts:46 · e2e/accessibility.spec.ts:70</div></li>
+  </ol>
+</section>
+
+<section id="claims">
+  <h2>What the status documents claim vs what the code does</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Claim (source)</th><th>Finding</th></tr></thead>
+    <tbody>
+      <tr><td>“S0-S15 application surface is present” <span class="note">STATUS.md:7</span></td><td>Endpoints and screens exist for most steps. Only S0 meets its Exit.</td></tr>
+      <tr><td>“decision persistence … implemented” <span class="note">STATUS.md:9-11</span></td><td><code>decision_service.persist_decision</code> has no callers, so decision runs are never stored.</td></tr>
+      <tr><td>“authenticated WebSocket subscriptions” <span class="note">STATUS.md:11</span></td><td>Authentication exists, but events don’t reach the browser (defect 6).</td></tr>
+      <tr><td>“Backend: 33 passed” <span class="note">STATUS.md:19</span></td><td>pytest collects 34 tests. Nine of them are one parametrized test (<code>test_simulation.py:20</code>) that only checks action names appear in a set. Without a database, 18 pass (see Test re-run).</td></tr>
+      <tr><td>“Live HTTP golden smoke selected AMB-002, H-003, 600 s” <span class="note">STATUS.md:34-35</span></td><td>True, but the outcome is fixed by the placeholder numbers in defect 3.</td></tr>
+      <tr><td>“Full emergency scenario passes” and “ICU/rejection/ambulance failure: backend coverage” <span class="note">docs/dod.md:57-61</span></td><td>No golden-slice test exists, and none of the named failure tests exist. The failure simulations are stubs.</td></tr>
+      <tr><td>“The working tree remains uncommitted by request” <span class="note">handoff 2026-09-15_2:5-6</span></td><td>The same work was committed and merged as PR #1.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="rerun">
+  <h2>Test re-run</h2>
+  <p>Re-run on this machine on 2026-09-15. PostgreSQL was not running and Docker was not on the PATH. Every check that needs the database therefore reads <b>not reproduced</b>, which is different from failed.</p>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Check</th><th>Claimed</th><th>Observed</th></tr></thead>
+    <tbody>
+      <tr><td>Backend <code>pytest apps/api/tests</code></td><td class="num">33 passed</td><td><span class="pill partial">Not reproduced</span> 34 collected: 18 passed, 7 failed, 9 errors. Every failure is <code>psycopg ConnectionTimeout</code> on 127.0.0.1:5432. An earlier session without a database got the same 18 / 7 / 9.</td></tr>
+      <tr><td>PostgreSQL integration (concurrency, append-only triggers, migration round-trip)</td><td class="num">passed</td><td><span class="pill partial">Not reproduced</span> These need the database. They have no skip marker, so they fail loudly rather than skipping silently.</td></tr>
+      <tr><td>Ruff</td><td class="num">clean</td><td><span class="pill done">Confirmed</span> All checks passed.</td></tr>
+      <tr><td>Web build</td><td class="num">passed</td><td><span class="pill done">Confirmed</span> Built in 749 ms; 310 kB JS.</td></tr>
+      <tr><td>Web lint</td><td class="num">passed</td><td><span class="pill partial">Passes with warnings</span> 0 errors, 3 unreported <code>react(set-state-in-effect)</code> warnings (<code>App.tsx:122, 129, 136</code>).</td></tr>
+      <tr><td>Vitest</td><td class="num">6 passed</td><td><span class="pill done">Confirmed</span> 7 passed in 4 files. The claim undercounted by one.</td></tr>
+      <tr><td>Mocked / live Playwright</td><td class="num">6 / 1 passed</td><td><span class="pill partial">Not run</span> The live spec skips unless <code>LIVE_E2E=1</code> is set with the API and database running. <code>scripts/full_suite.ps1</code> runs neither Playwright suite nor lint.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note" style="margin-top:12px">The 16 failing or erroring backend tests all need PostgreSQL. They cover lifecycle, hospital scoping, reservations, triggers and the migration round-trip. Once Docker Desktop is running, re-run them before any claim about them is trusted either way.</p>
+</section>
+
+<section id="process">
+  <h2>Process and hygiene</h2>
+  <div class="two">
+    <div class="box bad">
+      <h3>Needs to change</h3>
+      <ul>
+        <li><b>One 88-file commit named “initial”</b> covering fifteen build steps. No step can be reviewed, bisected or reverted on its own.</li>
+        <li><b>Neither mandatory gate ran.</b> STATUS records the blind evaluator as “unavailable”, and there was no user live-test sign-off.</li>
+        <li><b>Open items were silently dropped.</b> STATUS.md was rewritten wholesale, removing two items waiting on the user: the psycopg connect-timeout value and the <code>openapi-typescript</code> peer mismatch.</li>
+        <li><b>Decisions went unrecorded.</b> Placeholder ETAs, constant score weights and token storage in localStorage appear nowhere in <code>docs/spec-conflicts.md</code>, and <code>docs/implementation-decisions.md</code> was never created.</li>
+        <li><b>Unused schema.</b> Migrations 0010, 0011, 0013 and 0014 create tables that no application code uses.</li>
+      </ul>
+    </div>
+    <div class="box good">
+      <h3>Handled well</h3>
+      <ul>
+        <li>Every migration has a downgrade, and the chain round-trips.</li>
+        <li>No credentials, tokens or env files in the repository; <code>.gitignore</code> respected.</li>
+        <li>Project skills, agent instructions and the <code>skills/</code> mirror left untouched.</li>
+        <li>Handoffs were written. The first honestly states that application code had not been reviewed in that pass, and that nothing was signed off.</li>
+      </ul>
+    </div>
+  </div>
+  <p class="note" style="margin-top:14px">Authorship note: the 2026-09-15 handoff says the S1–S12 application code already existed uncommitted in the working tree when that session began. All of it landed under this one commit, so this report reviews the PR as delivered and does not attribute individual lines.</p>
+</section>
+
+<section id="second-audit">
+  <h2>Agreement with the earlier independent audit</h2>
+  <p>The unmerged audit on <code>worktree-floofy-meandering-newt</code> (handoff 2026-09-15_3) found the same placeholder ETAs, fixed route, constant score parts, static “Why selected?”, missing sweeper, missing reroute and compare, and unused tables. This review differs on two points:</p>
+  <ul>
+    <li><b>It rated S8–S9 “solid”.</b> Mission transitions are, but realtime delivery is broken (defect 6).</li>
+    <li><b>It named a missing <code>POST /reservations/{id}/confirm</code> as the golden-path blocker.</b> Accept already sets reservations to CONFIRMED (<code>services.py:271-272</code>). The real blockers are the accept idempotency-key bug and the UI never requesting acceptance.</li>
+  </ul>
+</section>
+
+<section id="next">
+  <h2>What happens next</h2>
+  <div class="callout">
+    <p>A ready-to-paste implementation prompt, <code>prompts/S01-S15_Gap_Closure.md</code>, turns every gap above into a step-by-step backlog in build order. It cites the evidence for each gap, the plan’s named tests to write, the rules and gates, and the six questions only the project owner can answer.</p>
+    <p>Priority is the vertical slice: S1 seed, S2 RBAC, S4–S7 real inputs and working accept, S9 realtime, then the S10 browser exit. S11–S15 come after.</p>
+  </div>
+</section>
+
+<footer>Prepared 2026-09-15 from repository state <span class="mono">4f893cd</span>. File and line references point at that commit.</footer>
+</div>
