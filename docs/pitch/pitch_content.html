@@ -14,11 +14,17 @@
     margin: 0;
   }
   .cover {
-    height: 257mm;
+    min-height: 250mm;
     display: flex;
     flex-direction: column;
-    justify-content: center;
     page-break-after: always;
+    padding-top: 6mm;
+  }
+  .cover .topbar {
+    height: 6px;
+    background: linear-gradient(90deg, #1d6f5e, #10202e);
+    border-radius: 3px;
+    margin-bottom: 40px;
   }
   .cover .kicker {
     color: #1d6f5e;
@@ -28,14 +34,14 @@
     text-transform: uppercase;
   }
   .cover h1 {
-    font-size: 30pt;
+    font-size: 28pt;
     margin: 10px 0 6px 0;
     color: #10202e;
   }
   .cover .sub {
     font-size: 13pt;
     color: #4a5568;
-    margin-bottom: 30px;
+    margin-bottom: 26px;
   }
   .cover .tagline {
     border-left: 4px solid #1d6f5e;
@@ -44,11 +50,48 @@
     font-style: italic;
     color: #10202e;
     background: #f4f9f7;
-    max-width: 420px;
+    max-width: 460px;
   }
+  .cover .facts {
+    margin-top: 44px;
+    border: 1px solid #dde3e8;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .cover .facts .facts-head {
+    background: #10202e;
+    color: #f4f9f7;
+    font-size: 10.5pt;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 8px 16px;
+  }
+  .cover .facts table { margin: 0; }
+  .cover .facts th, .cover .facts td { border-color: #dde3e8; }
+  .cover .contents {
+    margin-top: 30px;
+  }
+  .cover .contents .contents-head {
+    font-size: 10.5pt;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #10202e;
+    margin-bottom: 8px;
+  }
+  .cover .contents ol {
+    columns: 2;
+    -webkit-columns: 2;
+    padding-left: 20px;
+    font-size: 10.3pt;
+    color: #2b3947;
+  }
+  .cover .contents li { margin: 4px 0; }
   .cover .meta {
-    margin-top: 40px;
-    font-size: 10pt;
+    margin-top: auto;
+    padding-top: 30px;
+    font-size: 9.5pt;
     color: #7a8794;
   }
   h1.section-title {
@@ -143,12 +186,40 @@
 
 <!-- COVER -->
 <div class="cover">
+  <div class="topbar"></div>
   <div class="kicker">Hackathon Pitch Materials</div>
   <h1>Smart Ambulance Routing &amp;<br>Emergency Bed Allocation</h1>
   <div class="sub">Team explainer + full judge pitch content</div>
   <div class="tagline">
     "We do not simply navigate ambulances.<br>We coordinate the entire emergency journey."
   </div>
+
+  <div class="facts">
+    <div class="facts-head">Project at a Glance</div>
+    <table>
+      <tr><th style="width:34%;">What it is</th><td>A coordination platform linking ambulance selection, routing, hospital matching, acceptance, and bed reservation into one live decision</td></tr>
+      <tr><th>Status</th><td>Working prototype — full incident-to-arrival pipeline built and tested through build step S15 (one step, S13 ML/voice, deliberately skipped — see below)</td></tr>
+      <tr><th>Verified</th><td>33 backend tests, 6 frontend tests, 7 Playwright browser tests, and one live end-to-end run all passed</td></tr>
+      <tr><th>Honest limits</th><td>Hospital capacity data is simulated and labelled; ML/voice deliberately skipped rather than shipping unverified accuracy claims</td></tr>
+    </table>
+  </div>
+
+  <div class="contents">
+    <div class="contents-head">Contents</div>
+    <p style="font-size:9.5pt; color:#7a8794; margin:0 0 6px 0;">Part 1 &mdash; Team-member explainer</p>
+    <p style="font-size:9.5pt; color:#7a8794; margin:0 0 6px 0;">Part 2 &mdash; Judge pitch:</p>
+    <ol>
+      <li>The problem</li>
+      <li>Our idea (overview)</li>
+      <li>How it works</li>
+      <li>Tech stack</li>
+      <li>Feasibility &mdash; what works today</li>
+      <li>Implementation process</li>
+      <li>Practicality &mdash; making this real</li>
+      <li>Why it matters</li>
+    </ol>
+  </div>
+
   <div class="meta">Prepared 2026-09-15 &middot; Sourced from the project's plan, tech spec, and verified build status</div>
 </div>
 
@@ -157,9 +228,7 @@
 <p style="color:#7a8794; font-size:9.5pt; margin-top:-4px;">Short, beginner-friendly. For a teammate who hasn't read the specs.</p>
 
 <div class="explainer-box">
-<p>Right now, when an emergency call comes in, four decisions get made almost separately: which ambulance to send, which road to take, which hospital to go to, and whether that hospital can actually treat the patient when they arrive. Our project connects all of those decisions into one system. Instead of just finding the <em>nearest</em> ambulance or hospital, it finds the ambulance that's actually equipped and free, the fastest reliable route, and a hospital that has both the right equipment (an ICU bed, a ventilator, a trauma bay) and has explicitly agreed to accept the patient — with that resource held and ready before the ambulance even arrives.</p>
-<p>If anything changes mid-journey — traffic gets bad, a hospital's last ICU bed gets taken by someone else, the ambulance breaks down — the system automatically re-checks everything and can re-route or re-rank in real time, so nobody ends up at a hospital that can't take them.</p>
-<p>It doesn't diagnose patients or replace 112/emergency services — it's the coordination layer sitting on top of that process. In the prototype, hospital bed/capacity data is simulated and clearly labelled as such, but the matching logic, routing, resource reservation, and real-time updates are real, working, and tested end to end.</p>
+<p>Right now, the ambulance, the route, and the hospital for an emergency get picked almost separately — so a patient can end up at a hospital with no bed ready for them. Our project connects all three into one system: it picks the right ambulance, the fastest route, and a hospital that has actually agreed to take the patient and has a bed held and waiting. If anything changes on the way — traffic, a lost bed, a broken-down ambulance — it automatically re-checks everything, live. The hospital data in our demo is simulated and clearly labelled as such; everything else is real and working end to end.</p>
 </div>
 
 <!-- PART 2: JUDGE PITCH -->
