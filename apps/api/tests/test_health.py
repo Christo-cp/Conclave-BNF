@@ -11,6 +11,13 @@ from tests.conftest import client_for, with_database_url
 HEALTH_DB = "/api/v1/health/db"
 
 
+def test_root_reports_service_status(client: TestClient) -> None:
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.json() == {"name": "ResQFlow API", "status": "ok"}
+
+
 def unused_local_port() -> int:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -23,7 +30,7 @@ def test_health_db_up(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "connectivity": "ok",
-        "migration_version": None,
+            "migration_version": "0015_simulation_integrity",
         "simple_query": 1,
     }
     assert response.headers["X-Request-ID"].startswith("req_")

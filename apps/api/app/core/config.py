@@ -21,8 +21,18 @@ def env_file_path() -> Path:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
-    app_env: str
-    database_url: str
+    app_env: str = "development"
+    database_url: str = "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/smart_ambulance_dev"
+    jwt_secret: str = "development-only-change-me-32-byte-key"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 480
+    simulation_enabled: bool = True
+    resource_stale_after_s: int = 300
+    gps_stale_after_s: int = 60
+    reservation_hold_ttl_s: int = 60
+    eta_cap_s: int = 3600
+    routing_provider: str = "mock"
+    config_version: str = "mvp-1"
 
 
 @lru_cache

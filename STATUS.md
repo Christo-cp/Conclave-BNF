@@ -1,55 +1,62 @@
 # STATUS — Smart Ambulance
 
-Last updated 2026-09-14. Handoff: `handoffs/AMB_HANDOFF_2026-09-14.md`.
+Last updated 2026-09-15. Handoff: `handoffs/AMB_HANDOFF_2026-09-15_2.md`.
 
-## Working
+## Implemented
 
-- **Web app.** `pnpm --dir apps/web build` exits 0 on the Vite react-ts scaffold,
-  with every S0 package installed.
-- **API skeleton.** `app/main.py` serves `/api/v1/health/db` and
-  `/api/v1/openapi.json`.
-- **Tests.** `test_health_db_unreachable_503_envelope` PASSED.
-- **Lint.** `ruff check apps\api scripts` is clean.
-- **Git.** The repository is initialised with no commits. `.env` and `.env.test`
-  are ignored.
+- S0-S15 application surface is present through migration head
+  `0015_simulation_integrity`.
+- FastAPI/PostGIS backend, deterministic seed/reset, auth/RBAC, CRUD, decision
+  persistence, acceptance/reservation lifecycle, reassessment, simulation,
+  post-commit events, and authenticated WebSocket subscriptions are implemented.
+- Dispatcher, hospital, ambulance crew, and demo-controller workspaces are
+  implemented with loading, error, stale, unknown, and simulated states.
+- S13 ML/voice is intentionally skipped because the approved plan provides no
+  training data and forbids fabricated accuracy claims.
 
-## In progress
+## Automated verification
 
-**S0 · Repository, database, skeleton (M1).** Every file is written. Still to do:
-- start the database and run `db_create.py`;
-- `test_health_db_up` and the live health checks;
-- a `scripts/full_suite.ps1` run;
-- both gates, then the user's sign-off and commit.
+- Backend: `33 passed`; Ruff and Python compilation passed.
+- PostgreSQL integration: concurrent reservation, rollback, append-only trigger,
+  and migration round-trip tests passed.
+- Frontend: build, lint, and `6 passed` Vitest tests.
+- Mocked Playwright: `6 passed` accessibility and dispatcher tests.
+- Live Playwright: `1 passed` against the running FastAPI/Postgres stack.
+- Migration head: `0015_simulation_integrity`.
+- Latency: 50 deterministic matcher samples, p50 `0.009 ms`, p95 `0.012 ms`.
+- Secret/token/forbidden-claim scans and `git diff --check` passed.
 
-**Plan.** `docs/executable-plan.md` reflects every user decision and the user
-approved building from it. Quality gate: 7.6/10, adjudicated best of 5 rounds,
-below the threshold. Five defects remain (handoff §3.1): Playwright specs share
-one database, the per-file password template, C36's attribution, no map
-library, loose Exit comments. Fix them with the user's OK before S10/S11.
+## Live integration
 
-## Waiting on the user
+- Docker PostGIS was running during verification.
+- The live browser flow passed: login, incident, requirements, ambulance match,
+  ambulance confirmation, hospital match, and route calculation.
+- The live HTTP golden smoke selected `AMB-002`, selected `H-003`, and returned a
+  600-second mock route.
+- Frontend realtime URL is aligned with the mounted backend endpoint:
+  `/api/v1/ws`.
 
-1. **Docker Desktop.** In an administrator PowerShell: `wsl --install`, reboot,
-   `winget install -e --id Docker.DockerDesktop`, then start it once.
-2. **Database connect timeout.** A down database makes psycopg hang about 130 s
-   before failing. No spec gives a value. Ask for a `connect_timeout`, or whether
-   to accept the hang.
+## Environment limitations
 
-## Next
+- Backup/restore remains unverified and is marked `none` in `docs/dod.md`.
+- The latency measurement is for the deterministic matcher, not production
+  HTTP/database/browser latency.
+- Browser failure-scenario rehearsal is documented but not all scenarios have a
+  live browser recording.
+- The project is synthetic decision support, not clinical autonomy or a live
+  hospital-capacity integration.
 
-1. Finish the S0 exit once Docker is running.
-2. Run the blind-evaluator gate on the S0 code, then `/zero-error-gate`, then the
-   user's live test and sign-off.
-3. Run the secret checks, commit `S0: Repository, database, skeleton`, then start S1.
+## Known warnings
 
-## Known failures
+- Starlette/httpx and AnyIO deprecation warnings remain in the test client.
+- Playwright mocked tests may log expected Vite proxy connection warnings when
+  the API is intentionally not started.
+- Browser tokens remain client-side demo tokens in local storage; production
+  deployment must move session handling to secure HTTP-only cookies.
 
-- **`test_health_db_up`** errors at setup: psycopg `ConnectionTimeout`, because
-  no database exists yet (Docker missing). Environmental; pre-existing until
-  Docker is installed.
-- **Slow unreachable test.** `test_health_db_unreachable_503_envelope` passes but
-  takes about 130 s (bug catalog Part C).
-- **Warnings.** Starlette deprecates `TestClient` with httpx; anyio deprecates
-  `BlockingPortal`. Warnings only.
-- **Peer mismatch.** `openapi-typescript` 7.13.0 declares a TypeScript `^5` peer,
-  and 6.0.3 is installed. Check this at S10.
+## User sign-off
+
+The blind evaluator was unavailable and the zero-error gate requires explicit
+user live-test sign-off. Run the commands in `docs/demo/golden-scenario.md`,
+confirm the live workflow and failure scenarios, then explicitly sign off before
+calling the release complete.
