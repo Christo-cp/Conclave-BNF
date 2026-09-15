@@ -43,7 +43,16 @@ export const api = {
   mission: (missionId: string) => request<Mission>(`/missions/${missionId}`),
   patchMission: (missionId: string, status: string, stateVersion: number) => request<Mission>(`/missions/${missionId}`, { method: 'PATCH', body: JSON.stringify({ status, state_version: stateVersion }) }),
   resources: (hospitalId: string) => request<ResourceSnapshot[]>(`/hospitals/${hospitalId}/resources`),
-  simulation: (action: string) => request<{ status: string }>('/simulation/control', { method: 'POST', body: JSON.stringify({ action }) }),
+  simulation: (action: string) => {
+    const paths: Record<string, string> = {
+      RESET_SCENARIO: 'reset',
+      TRAFFIC_CHANGE: 'traffic-change',
+      HOSPITAL_REJECT: 'hospital-reject',
+      RESOURCE_LOSS: 'resource-lost',
+      RECONNECT_STREAM: 'heartbeat',
+    }
+    return request<{ mode: string }>(`/admin/simulation/${paths[action] ?? action}`, { method: 'POST', body: JSON.stringify({}) })
+  },
   ambulances: () => request<AmbulanceRecord[]>('/ambulances'),
   hospitals: () => request<HospitalRecord[]>('/hospitals'),
   getHospital: (hospitalId: string) => request<HospitalRecord>(`/hospitals/${hospitalId}`),

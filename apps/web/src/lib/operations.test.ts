@@ -16,4 +16,15 @@ describe('operations API contract', () => {
     ])
     fetchMock.mockRestore()
   })
+
+  it('calls the authenticated simulation action endpoint', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ mode: 'SIMULATED' }), { status: 200 }))
+    const { api } = await import('./api')
+
+    await api.simulation('RESOURCE_LOSS')
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('/api/v1/admin/simulation/resource-lost')
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', body: JSON.stringify({}) })
+    fetchMock.mockRestore()
+  })
 })

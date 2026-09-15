@@ -99,3 +99,4 @@ and transfer here. Part C records bugs actually diagnosed in this project.
 (one line each: date · symptom · confirmed cause · regression test name)
 
 - 2026-09-14 · `/api/v1/health/db` and pytest setup hang ~130 s when PostgreSQL is down · psycopg 3.3.5 on Windows raises `ConnectionTimeout` against a closed local port only after ~130 s when no `connect_timeout` is set (measured: raw socket refused in 2.02 s, `psycopg.connect` 130.06 s) · `test_health_db_unreachable_503_envelope` (passes slowly; the fix waits for a timeout value from the user)
+- 2026-09-16 · Demo controller could not execute simulation controls in the live UI · frontend called `/simulation/control` while backend exposed `/admin/simulation/{action}`, and the seed omitted the DEMO_CONTROLLER user · `operations.test.ts`, `test_seed.py::test_reset_seeds_demo_controller_user`, and mocked demo-controls Playwright test
