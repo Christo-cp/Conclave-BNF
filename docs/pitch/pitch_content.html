@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Smart Ambulance — Team Explainer & Judge Pitch</title>
+<style>
+  @page { size: A4; margin: 20mm 18mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #1c2430;
+    line-height: 1.55;
+    font-size: 11.5pt;
+    margin: 0;
+  }
+  .cover {
+    height: 257mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    page-break-after: always;
+  }
+  .cover .kicker {
+    color: #1d6f5e;
+    font-weight: 700;
+    letter-spacing: 2px;
+    font-size: 11pt;
+    text-transform: uppercase;
+  }
+  .cover h1 {
+    font-size: 30pt;
+    margin: 10px 0 6px 0;
+    color: #10202e;
+  }
+  .cover .sub {
+    font-size: 13pt;
+    color: #4a5568;
+    margin-bottom: 30px;
+  }
+  .cover .tagline {
+    border-left: 4px solid #1d6f5e;
+    padding: 10px 18px;
+    font-size: 13.5pt;
+    font-style: italic;
+    color: #10202e;
+    background: #f4f9f7;
+    max-width: 420px;
+  }
+  .cover .meta {
+    margin-top: 40px;
+    font-size: 10pt;
+    color: #7a8794;
+  }
+  h1.section-title {
+    font-size: 20pt;
+    color: #10202e;
+    border-bottom: 3px solid #1d6f5e;
+    padding-bottom: 8px;
+    margin-top: 0;
+  }
+  h2 {
+    font-size: 14pt;
+    color: #1d6f5e;
+    margin-top: 26px;
+    margin-bottom: 8px;
+  }
+  h3 {
+    font-size: 12pt;
+    color: #10202e;
+    margin-top: 16px;
+    margin-bottom: 6px;
+  }
+  p { margin: 8px 0; }
+  .callout {
+    background: #f4f9f7;
+    border-left: 4px solid #1d6f5e;
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-style: italic;
+  }
+  .explainer-box {
+    background: #f7f8fa;
+    border: 1px solid #dde3e8;
+    border-radius: 8px;
+    padding: 18px 20px;
+    font-size: 12pt;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px 0; }
+  .chip {
+    background: #eaf3f0;
+    color: #1d6f5e;
+    border: 1px solid #c7ded6;
+    border-radius: 14px;
+    padding: 3px 11px;
+    font-size: 9.5pt;
+    font-weight: 600;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 16px 0; font-size: 10pt; }
+  th, td { border: 1px solid #dde3e8; padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: #eef2f4; color: #10202e; }
+  .flow {
+    background: #f7f8fa;
+    border: 1px dashed #b9c4cc;
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 10.3pt;
+    color: #2b3947;
+    margin: 10px 0;
+  }
+  .flow .arrow { color: #1d6f5e; font-weight: 700; }
+  .tech-block { margin-bottom: 14px; }
+  .tech-block .name { font-weight: 700; color: #10202e; }
+  .honest {
+    background: #fff8ee;
+    border: 1px solid #e8d6ab;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 10.5pt;
+    margin: 10px 0;
+  }
+  .honest .label { font-weight: 700; color: #8a6416; display: block; margin-bottom: 4px; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  li { margin: 3px 0; }
+  .page-break { page-break-before: always; }
+  .closer {
+    margin-top: 20px;
+    padding: 16px 20px;
+    background: #10202e;
+    color: #f4f9f7;
+    border-radius: 8px;
+    font-size: 12.5pt;
+    font-style: italic;
+  }
+  footer.foot {
+    margin-top: 30px;
+    font-size: 8.5pt;
+    color: #9aa5ae;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="kicker">Hackathon Pitch Materials</div>
+  <h1>Smart Ambulance Routing &amp;<br>Emergency Bed Allocation</h1>
+  <div class="sub">Team explainer + full judge pitch content</div>
+  <div class="tagline">
+    "We do not simply navigate ambulances.<br>We coordinate the entire emergency journey."
+  </div>
+  <div class="meta">Prepared 2026-09-15 &middot; Sourced from the project's plan, tech spec, and verified build status</div>
+</div>
+
+<!-- PART 1: TEAM EXPLAINER -->
+<h1 class="section-title">Part 1 — Team-Member Explainer</h1>
+<p style="color:#7a8794; font-size:9.5pt; margin-top:-4px;">Short, beginner-friendly. For a teammate who hasn't read the specs.</p>
+
+<div class="explainer-box">
+<p>Right now, when an emergency call comes in, four decisions get made almost separately: which ambulance to send, which road to take, which hospital to go to, and whether that hospital can actually treat the patient when they arrive. Our project connects all of those decisions into one system. Instead of just finding the <em>nearest</em> ambulance or hospital, it finds the ambulance that's actually equipped and free, the fastest reliable route, and a hospital that has both the right equipment (an ICU bed, a ventilator, a trauma bay) and has explicitly agreed to accept the patient — with that resource held and ready before the ambulance even arrives.</p>
+<p>If anything changes mid-journey — traffic gets bad, a hospital's last ICU bed gets taken by someone else, the ambulance breaks down — the system automatically re-checks everything and can re-route or re-rank in real time, so nobody ends up at a hospital that can't take them.</p>
+<p>It doesn't diagnose patients or replace 112/emergency services — it's the coordination layer sitting on top of that process. In the prototype, hospital bed/capacity data is simulated and clearly labelled as such, but the matching logic, routing, resource reservation, and real-time updates are real, working, and tested end to end.</p>
+</div>
+
+<!-- PART 2: JUDGE PITCH -->
+<div class="page-break"></div>
+<h1 class="section-title">Part 2 — Judge Pitch</h1>
+<p style="color:#7a8794; font-size:9.5pt; margin-top:-4px;">Full spoken content, in presentation order. Beginner-friendly, persuasive, and honest about limits.</p>
+
+<h2>1. The Problem</h2>
+<p>Every year, precious minutes are lost in emergencies — not because ambulances are slow, but because of something less visible: <strong>bad coordination</strong>. An ambulance can be sent that isn't equipped for the patient's actual condition. It can be routed to the nearest hospital, only for that hospital to have no ICU bed free, or to reject the patient on arrival — forcing a second, more dangerous journey while the clock keeps running.</p>
+<p>Today, four decisions — which ambulance, which route, which hospital, and whether a bed is actually ready — are handled as separate, disconnected steps. Our project treats them as <strong>one decision, made together, and kept up to date as things change.</strong></p>
+
+<h2>2. Our Idea (Overview)</h2>
+<p>The Smart Ambulance Routing &amp; Emergency Bed Allocation System is a coordination platform that manages the entire emergency journey — from the moment a call comes in, to a hospital bed being physically ready for the patient.</p>
+<p>Given an emergency and the patient's needs, the system doesn't just find the nearest ambulance and nearest hospital. It:</p>
+<ul>
+  <li>finds the ambulance that is actually free <em>and</em> equipped for this specific patient;</li>
+  <li>calculates the fastest reliable route, not just the shortest one;</li>
+  <li>filters hospitals down to the ones that can medically handle the case;</li>
+  <li>ranks those hospitals by real capability and likelihood of acceptance;</li>
+  <li>gets that hospital to explicitly say yes; and</li>
+  <li>reserves the exact resource — an ICU bed, a ventilator, a trauma bay — before the ambulance ever arrives.</li>
+</ul>
+<div class="callout">
+  Nearest is not necessarily fastest.<br>
+  Fastest is not necessarily suitable.<br>
+  Suitable is not necessarily accepting.<br>
+  Available now is not necessarily available on arrival.
+</div>
+<p>We built the whole system to solve for the <strong>best feasible chain</strong> — not the closest single point.</p>
+
+<h2>3. How It Works</h2>
+<div class="flow">
+Emergency reported <span class="arrow">&rarr;</span> patient needs captured (e.g. "ICU required", "trauma required")
+<span class="arrow">&rarr;</span> ambulances scored on suitability, availability &amp; ETA <span class="arrow">&rarr;</span> best ambulance assigned
+<span class="arrow">&rarr;</span> real route calculated, with alternatives considered <span class="arrow">&rarr;</span> hospitals filtered by medical capability and current resource state
+<span class="arrow">&rarr;</span> hospitals ranked <span class="arrow">&rarr;</span> hospital staff explicitly accept or reject on their own dashboard
+<span class="arrow">&rarr;</span> on acceptance, the specific resource is reserved — server-side, transaction-locked, so two ambulances can never claim the same bed
+<span class="arrow">&rarr;</span> the mission is tracked live over a real-time connection <span class="arrow">&rarr;</span> if conditions change, the system automatically reassesses and can re-route or re-rank <span class="arrow">&rarr;</span> the hospital gets advance notice to prepare <span class="arrow">&rarr;</span> patient arrives at a hospital that is ready and waiting.
+</div>
+<p>Two things make this trustworthy rather than a black box: every recommendation comes with a plain-language <strong>explanation</strong> of why that ambulance or hospital was chosen, and a human dispatcher can <strong>override</strong> any decision at any time. The system never invents a recommendation when nothing genuinely qualifies — it says so instead.</p>
+
+<h2>4. Tech Stack</h2>
+
+<h3>Frontend — what dispatchers, hospitals and crews actually see</h3>
+<div class="chips">
+  <span class="chip">React + TypeScript</span><span class="chip">Vite</span><span class="chip">Tailwind CSS</span>
+  <span class="chip">TanStack Query</span><span class="chip">Zustand</span><span class="chip">React Router</span>
+  <span class="chip">React Hook Form + Zod</span><span class="chip">Recharts</span>
+</div>
+<p>Three live screens — dispatcher, hospital, and ambulance crew — plus a demo controller, built quickly and kept type-safe with React/TypeScript on Vite. TanStack Query and Zustand keep every screen automatically in sync with the live backend instead of needing manual refreshes; React Hook Form and Zod validate inputs (like patient requirements) before they ever reach the server.</p>
+
+<h3>Backend — the decision-making brain</h3>
+<div class="chips">
+  <span class="chip">Python</span><span class="chip">FastAPI</span><span class="chip">Pydantic</span>
+  <span class="chip">SQLAlchemy</span><span class="chip">Alembic</span><span class="chip">WebSockets</span>
+</div>
+<p>FastAPI runs all the matching, ranking, and business rules, with Pydantic validating every request. SQLAlchemy and Alembic manage the database schema safely as it evolves. WebSockets push live updates — a hospital accepting, a bed being reserved, a route changing — to every open screen instantly.</p>
+
+<h3>Database — where location actually matters</h3>
+<div class="chips"><span class="chip">PostgreSQL</span><span class="chip">PostGIS</span></div>
+<p>PostGIS is a real spatial database extension, so "which ambulance/hospital is actually near this incident" is a genuine geographic calculation, not a rough approximation.</p>
+
+<h3>Optimization &amp; AI — used only where they earn their place</h3>
+<div class="chips">
+  <span class="chip">Google OR-Tools</span><span class="chip">XGBoost / LightGBM</span><span class="chip">scikit-learn</span>
+</div>
+<p>OR-Tools is available for the matching layer where a proper solver beats simple sorting. XGBoost/scikit-learn power an optional arrival-time prediction layer — used only where a prediction genuinely improves a decision, and never used to claim an accuracy number we haven't actually measured.</p>
+
+<h3>Testing — proving it works, not just claiming it</h3>
+<div class="chips">
+  <span class="chip">Pytest</span><span class="chip">Vitest</span><span class="chip">React Testing Library</span><span class="chip">Playwright</span>
+</div>
+<p>Backend logic, frontend components, and full real-browser flows are all covered by automated tests (results in the Feasibility section below).</p>
+
+<h2>5. Feasibility — What Actually Works Today</h2>
+<p>This is not a mockup or a slide deck pretending to be a product. As of today, the build covers every planned step through migration <code>0015_simulation_integrity</code>: authentication and role-based access, the full incident &rarr; ambulance &rarr; route &rarr; hospital &rarr; acceptance &rarr; reservation pipeline, live recalculation when conditions change, failure simulation, and authenticated real-time updates over WebSockets — across all three live dashboards.</p>
+<table>
+  <tr><th>Verification</th><th>Result</th></tr>
+  <tr><td>Backend unit/integration tests</td><td>33 passed; linting and compilation clean</td></tr>
+  <tr><td>Database integrity tests</td><td>Concurrent reservation, rollback, and migration round-trip all passed — double-booking a bed is actually prevented at the database level, not just in theory</td></tr>
+  <tr><td>Frontend tests</td><td>Build, lint, and 6 Vitest tests passed</td></tr>
+  <tr><td>Browser tests (mocked)</td><td>6 accessibility &amp; dispatcher-flow Playwright tests passed</td></tr>
+  <tr><td>Browser test (live stack)</td><td>1 full Playwright run passed against the real running FastAPI + PostgreSQL system</td></tr>
+  <tr><td>Live end-to-end walkthrough</td><td>Login &rarr; incident &rarr; requirements &rarr; ambulance match &rarr; confirmation &rarr; hospital match &rarr; route calculation, all executed live</td></tr>
+  <tr><td>Matcher latency</td><td>50 deterministic samples: p50 0.009&nbsp;ms, p95 0.012&nbsp;ms (matching-engine latency, not full network/browser latency)</td></tr>
+</table>
+<div class="honest">
+  <span class="label">Said plainly, up front</span>
+  Hospital capacity and acceptance are explicitly <strong>simulated</strong> in this prototype and labelled "DEMO MODE" in the UI — we are not presenting simulated data as live. The routing provider is a deterministic mock, which is what makes the demo reliable and able to run offline. The optional ML/voice layer (S13) was intentionally skipped rather than shipped with a fabricated accuracy number, because the project has a hard rule against inventing numbers.
+</div>
+
+<h2>6. Implementation Process</h2>
+<p>The system was built in a fixed phase order, and each phase had to produce a genuinely working output before the next one started — nothing was designed in isolation and stitched together at the end:</p>
+<table>
+  <tr><th>Phase</th><th>What it delivered</th></tr>
+  <tr><td>Foundation</td><td>Repository, auth, base UI — a running application</td></tr>
+  <tr><td>Core data model</td><td>Incidents, ambulances, hospitals, resources, reservations, missions</td></tr>
+  <tr><td>Ambulance matching</td><td>Capability + availability + ETA scoring &rarr; working ambulance selection</td></tr>
+  <tr><td>Routing</td><td>Real route calculation with alternatives &rarr; working map</td></tr>
+  <tr><td>Hospital matching</td><td>Capability + resource filtering &rarr; ranked, explained recommendation</td></tr>
+  <tr><td>Acceptance</td><td>Hospital dashboard with accept/reject/timeout &rarr; confirmed destination</td></tr>
+  <tr><td>Reservation</td><td>Transactional hold/confirm/release/expiry &rarr; safe resource reservation</td></tr>
+  <tr><td>Real-time coordination</td><td>WebSockets, live state, dynamic re-ranking &rarr; a truly live mission</td></tr>
+  <tr><td>Failure simulation</td><td>Traffic change, ICU loss, hospital rejection, ambulance/GPS failure &rarr; stress-tested live</td></tr>
+  <tr><td>AI layer (optional)</td><td>ETA prediction with confidence, added only after everything else worked</td></tr>
+  <tr><td>QA &amp; demo rehearsal</td><td>Full scenario validation and presentation polish</td></tr>
+</table>
+<p>This order was deliberate: get one complete, real, end-to-end emergency working first, then layer on real-time behaviour, failure handling, and AI — never the reverse.</p>
+
+<h2>7. Practicality — Making This Real</h2>
+<p>The architecture was designed for the handoff to production from day one, not bolted on afterward:</p>
+<ul>
+  <li><strong>A clean integration seam is already built in.</strong> Hospital data sits behind an integration interface. Moving from simulated hospital capacity to a real, authenticated hospital feed is a matter of plugging in an adapter — not redesigning the core system.</li>
+  <li><strong>The security and audit basics real partners ask for first are already in place</strong> — role-based access control, authenticated real-time connections, and an audit trail of every critical decision.</li>
+  <li><strong>Double-booking is already impossible</strong>, because reservations are server-side, transaction-locked, and database-enforced — this is the piece hospitals and regulators would scrutinize hardest, and it's proven, not promised.</li>
+  <li><strong>A realistic rollout path:</strong> pilot in a single city or district with a small set of partner hospitals; swap their data from simulated to a live feed through the existing adapter once an integration agreement is signed; expand ambulance and hospital coverage gradually from there.</li>
+  <li><strong>The production evolution is mapped, not hand-waved</strong> — from today's single backend service to dedicated dispatch, hospital, routing, ML and reservation services connected to real hospital systems, ambulance tracking (AVL), traffic providers, and emergency-response infrastructure.</li>
+</ul>
+<div class="honest">
+  <span class="label">What this prototype cannot yet validate</span>
+  Real clinical outcomes, actual mortality impact, live nationwide hospital integration, hospital cooperation at scale, and performance under real emergency-traffic load. We say this plainly rather than implying it's already solved — the roadmap above is how we'd close each gap.
+</div>
+
+<h2>8. Why It Matters</h2>
+<p>Every part of this system exists because emergencies are won or lost on minutes, and today those minutes get wasted on decisions made separately: the right ambulance sent to the wrong hospital, or the right hospital found too late to get ready. We built the coordination layer that closes that gap.</p>
+
+<div class="closer">
+"We're not just moving an ambulance. We're getting a patient to a hospital bed that is medically right, has already said yes, and is already waiting for them."
+</div>
+
+<footer class="foot">Smart Ambulance Routing &amp; Emergency Bed Allocation System &middot; Hackathon prototype &middot; Content sourced from plan.md, techspec.md, docs/pitch/slides.md and STATUS.md</footer>
+
+</body>
+</html>
