@@ -1,62 +1,59 @@
 # STATUS — Smart Ambulance
 
-Last updated 2026-09-15. Handoff: `handoffs/AMB_HANDOFF_2026-09-15_2.md`.
+Last updated 2026-09-15 (audit pass). Handoff: `handoffs/AMB_HANDOFF_2026-09-15_3.md`.
 
-## Implemented
+## Working
 
-- S0-S15 application surface is present through migration head
-  `0015_simulation_integrity`.
-- FastAPI/PostGIS backend, deterministic seed/reset, auth/RBAC, CRUD, decision
-  persistence, acceptance/reservation lifecycle, reassessment, simulation,
-  post-commit events, and authenticated WebSocket subscriptions are implemented.
-- Dispatcher, hospital, ambulance crew, and demo-controller workspaces are
-  implemented with loading, error, stale, unknown, and simulated states.
-- S13 ML/voice is intentionally skipped because the approved plan provides no
-  training data and forbids fabricated accuracy claims.
+- S0-S3: skeleton, schema/migrations (`0001`-`0015`, clean chain), seed/reset,
+  auth/RBAC scaffolding, slice CRUD. Matches spec.
+- S8-S9: mission state transitions (versioned, conflict-checked) and realtime
+  (`/ws`, JWT+RBAC, client dedupe/backoff/resync). Matches spec.
+- Reservation row-locking, idempotency-key handling, unknown-≠-available
+  handling (BR-003), simulated-data labelling (BR-012): implemented correctly
+  in both backend and frontend.
+- `ruff check`: clean. `pnpm build`: clean. `vitest run`: 7 passed.
 
-## Automated verification
+## In progress / broken
 
-- Backend: `33 passed`; Ruff and Python compilation passed.
-- PostgreSQL integration: concurrent reservation, rollback, append-only trigger,
-  and migration round-trip tests passed.
-- Frontend: build, lint, and `6 passed` Vitest tests.
-- Mocked Playwright: `6 passed` accessibility and dispatcher tests.
-- Live Playwright: `1 passed` against the running FastAPI/Postgres stack.
-- Migration head: `0015_simulation_integrity`.
-- Latency: 50 deterministic matcher samples, p50 `0.009 ms`, p95 `0.012 ms`.
-- Secret/token/forbidden-claim scans and `git diff --check` passed.
+- **Reservation lifecycle cannot complete**: `POST /reservations/{id}/confirm`
+  does not exist; `consume()` requires `CONFIRMED`, so it's unreachable.
+- **Hospital-accept step is skipped in the dispatcher UI** — `createAcceptance`
+  is defined but never called (BR-006).
+- **"Why selected?" decision-trace panel is hardcoded static text**
+  (`App.tsx:186-188`), not bound to the selected candidate.
+- Ambulance/hospital scoring formulas have ~half their weight terms hardcoded
+  to constants instead of computed per candidate; no `RoutingProvider`
+  abstraction; `/routes/calculate` always returns a fixed 600s.
+- No automatic reservation-expiry sweeper (manual `/expire` only).
+- BR-009 (exclude rejected hospitals) and BR-013 (reassessment hysteresis)
+  unenforced. Missing: `POST /missions`, `POST /missions/{id}/reroute`,
+  `POST /routes/matrix`, `POST /routes/compare`, map (no Mapbox/Leaflet).
+- 5 migrations (`0006`, `0010`, `0011`, `0013`, `0014`) add tables no
+  application code reads or writes.
+- S13 ML/voice: intentionally skipped (no training data, per plan).
 
-## Live integration
+## Next
 
-- Docker PostGIS was running during verification.
-- The live browser flow passed: login, incident, requirements, ambulance match,
-  ambulance confirmation, hospital match, and route calculation.
-- The live HTTP golden smoke selected `AMB-002`, selected `H-003`, and returned a
-  600-second mock route.
-- Frontend realtime URL is aligned with the mounted backend endpoint:
-  `/api/v1/ws`.
+1. Implement `/reservations/{id}/confirm`; wire dispatcher UI to call
+   `createAcceptance` before route calculation — unblocks the real golden path.
+2. Bind the decision-trace panel to the selected candidate's real data.
+3. Re-run `pytest`/`pnpm test`/Playwright with Docker+Postgres+Chromium
+   available — this session had none, so test-count claims below are
+   unverified here, not confirmed.
 
-## Environment limitations
+## Known failures / unverified this session
 
-- Backup/restore remains unverified and is marked `none` in `docs/dod.md`.
-- The latency measurement is for the deterministic matcher, not production
-  HTTP/database/browser latency.
-- Browser failure-scenario rehearsal is documented but not all scenarios have a
-  live browser recording.
-- The project is synthetic decision support, not clinical autonomy or a live
-  hospital-capacity integration.
+- `pytest apps/api/tests -q` here: 18 passed, 7 failed, 9 errors — all
+  `psycopg.ConnectionTimeout` (no Postgres in this sandbox), not assertion
+  failures. Needs re-run with Docker before trusting any backend pass count.
+- Playwright (mocked and live): could not launch Chromium in this sandbox.
+- Backup/restore: unverified (`docs/dod.md`).
+- User live-test sign-off: outstanding, as in every prior status.
 
-## Known warnings
+## Simulated / mocked
 
-- Starlette/httpx and AnyIO deprecation warnings remain in the test client.
-- Playwright mocked tests may log expected Vite proxy connection warnings when
-  the API is intentionally not started.
-- Browser tokens remain client-side demo tokens in local storage; production
-  deployment must move session handling to secure HTTP-only cookies.
-
-## User sign-off
-
-The blind evaluator was unavailable and the zero-error gate requires explicit
-user live-test sign-off. Run the commands in `docs/demo/golden-scenario.md`,
-confirm the live workflow and failure scenarios, then explicitly sign off before
-calling the release complete.
+- ETA in both decision engines is derived from the entity's own ID digits, not
+  real distance/routing — labelled here as simulated; not yet labelled as such
+  in the UI.
+- `/routes/calculate` always returns a fixed mock route (`distance_m=6000,
+  duration_seconds=600`).
