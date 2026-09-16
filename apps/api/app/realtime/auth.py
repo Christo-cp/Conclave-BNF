@@ -29,5 +29,7 @@ def can_subscribe(user: User, channel: str) -> bool:
     if kind == "hospital":
         return bool(user.hospital_id and str(user.hospital_id) == identifier) or "SYSTEM_ADMIN" in roles
     if kind == "ambulance":
-        return bool(roles.intersection({"AMBULANCE_CREW", "DISPATCHER", "SYSTEM_ADMIN", "DEMO_CONTROLLER"}))
+        if roles.intersection({"DISPATCHER", "SYSTEM_ADMIN", "DEMO_CONTROLLER"}):
+            return True
+        return "AMBULANCE_CREW" in roles and bool(user.ambulance_id) and str(user.ambulance_id) == identifier
     return False

@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     gps_stale_after_s: int = 60
     reservation_hold_ttl_s: int = 60
     eta_cap_s: int = 3600
+    reroute_significant_delta_s: int = 120
     routing_provider: str = "mock"
     config_version: str = "mvp-1"
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
