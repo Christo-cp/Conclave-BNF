@@ -9,10 +9,11 @@ The build plan, setup commands and step-by-step exits are in
 
 ## Current state
 
-The repository contains the implemented S0-S15 prototype surface, Alembic
-revisions through `0015_simulation_integrity`, deterministic simulation seed
-data, dispatcher/crew/hospital/demo-controller flows, authenticated realtime
-events, and the reservation/reassessment lifecycle. The application uses
+The repository contains an implemented S1-S8 backend foundation, realtime core,
+selected S11/S12 services, and Alembic revisions through
+`0018_decision_trace_fields`. It includes deterministic simulation seed data,
+dispatcher/crew/hospital/demo-controller surfaces, authenticated realtime
+events, and the reservation/sweeper lifecycle. The application uses
 synthetic data and the mock routing provider for repeatable local
 demonstrations. S13 ML and voice are intentionally not built.
 
@@ -65,6 +66,8 @@ presented as live clinical data.
 
 ## Not built
 
-- S13 ML and voice: no training data is available and no accuracy claim is made.
+- S13 ML and voice: FR-023 arrival-time readiness and FR-032 voice control are
+  intentionally skipped because no training data is available and no accuracy
+  claim is made.
 - Production hospital integrations, operational backup/restore, and clinical
   autonomy are outside this synthetic hackathon prototype.

@@ -41,7 +41,7 @@ verified; it is deliberately not a claim of completion.
 | Requirement | Evidence |
 |---|---|
 | PostgreSQL/PostGIS is running | Docker-backed test run in final verification |
-| All P0 tables exist | `alembic upgrade head`; migration head `0015_simulation_integrity` |
+| All P0 tables exist | `alembic upgrade head`; migration head `0018_decision_trace_fields` |
 | Migrations are reproducible | PostgreSQL migration round-trip test passed |
 | Foreign keys are enforced | PostgreSQL integration tests passed |
 | Core indexes exist | `0003`-`0012` index revisions |

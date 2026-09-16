@@ -10,10 +10,12 @@ from app.core.enums import AmbulanceStatus, HospitalStatus, Role
 from app.core.errors import ApiError, ErrorCode
 from app.db.models import (
     Ambulance,
+    AuditLog,
     Capability,
     Hospital,
     HospitalCapability,
     HospitalResource,
+    ResourceEvent,
     User,
 )
 from app.dependencies import Db, require_roles
@@ -109,9 +111,12 @@ def update_ambulance(ambulance_id: UUID, payload: AmbulanceUpdate, session: Db, 
     item = session.get(Ambulance, ambulance_id)
     if item is None:
         raise ApiError(404, ErrorCode.NOT_FOUND, "Ambulance not found.")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    if payload.version != item.version:
+        raise ApiError(409, ErrorCode.CONFLICT, "Ambulance state is newer than this client.")
+    for field, value in payload.model_dump(exclude_unset=True, exclude={"version"}).items():
         setattr(item, field, value)
     item.version += 1
+    session.add(AuditLog(action="AMBULANCE_UPDATED", entity_type="ambulance", entity_id=str(item.id), payload={"version": item.version}))
     session.commit()
     return ambulance_json(item)
 
@@ -151,11 +156,14 @@ def update_ambulance_status(ambulance_id: UUID, payload: AmbulanceStatusUpdate, 
     item = session.get(Ambulance, ambulance_id)
     if item is None:
         raise ApiError(404, ErrorCode.NOT_FOUND, "Ambulance not found.")
+    if payload.version != item.version:
+        raise ApiError(409, ErrorCode.CONFLICT, "Ambulance state is newer than this client.")
     try:
         item.status = AmbulanceStatus(payload.status)
     except ValueError as exc:
         raise ApiError(422, ErrorCode.VALIDATION_ERROR, "Invalid ambulance status.") from exc
     item.version += 1
+    session.add(AuditLog(action="AMBULANCE_STATUS_CHANGED", entity_type="ambulance", entity_id=str(item.id), payload={"status": item.status}))
     session.commit()
     return ambulance_json(item)
 
@@ -195,7 +203,7 @@ def update_hospital(hospital_id: UUID, payload: HospitalUpdate, session: Db, use
     item = session.get(Hospital, hospital_id)
     if item is None:
         raise ApiError(404, ErrorCode.NOT_FOUND, "Hospital not found.")
-    values = payload.model_dump(exclude_unset=True)
+    values = payload.model_dump(exclude_unset=True, exclude={"version"})
     latitude, longitude = values.pop("latitude", item.latitude), values.pop("longitude", item.longitude)
     for field, value in values.items():
         setattr(item, field, value)
@@ -251,11 +259,16 @@ def update_hospital_resource(hospital_id: UUID, payload: ResourceUpdate, session
         raise ApiError(404, ErrorCode.NOT_FOUND, "Hospital resource not found.")
     if resource.hospital_id != hospital_id:
         raise ApiError(403, ErrorCode.AUTHORIZATION_ERROR, "Hospital scope denied.")
-    values = payload.model_dump(exclude_unset=True)
+    if payload.version != resource.version:
+        raise ApiError(409, ErrorCode.CONFLICT, "Resource state is newer than this client.")
+    old_available, old_reserved = resource.available_capacity, resource.reserved_capacity
+    values = payload.model_dump(exclude_unset=True, exclude={"version"})
     values.pop("resource_id", None)
     for field, value in values.items():
         setattr(resource, field, value)
     resource.version += 1
+    session.add(ResourceEvent(hospital_resource_id=resource.id, event_type="UPDATED", old_available=old_available, new_available=resource.available_capacity, old_reserved=old_reserved, new_reserved=resource.reserved_capacity, source="API", actor_id=user.id))
+    session.add(AuditLog(actor_id=user.id, action="RESOURCE_UPDATED", entity_type="hospital_resource", entity_id=str(resource.id), payload={"version": resource.version}))
     session.commit()
     return resource_json(resource)
 
@@ -296,11 +309,16 @@ def patch_resource(resource_id: UUID, payload: ResourceUpdate, session: Db, user
     if resource is None:
         raise ApiError(404, ErrorCode.NOT_FOUND, "Hospital resource not found.")
     scoped_hospital(user, resource.hospital_id)
-    values = payload.model_dump(exclude_unset=True)
+    if payload.version != resource.version:
+        raise ApiError(409, ErrorCode.CONFLICT, "Resource state is newer than this client.")
+    old_available, old_reserved = resource.available_capacity, resource.reserved_capacity
+    values = payload.model_dump(exclude_unset=True, exclude={"version"})
     values.pop("resource_id", None)
     for field, value in values.items():
         setattr(resource, field, value)
     resource.version += 1
+    session.add(ResourceEvent(hospital_resource_id=resource.id, event_type="UPDATED", old_available=old_available, new_available=resource.available_capacity, old_reserved=old_reserved, new_reserved=resource.reserved_capacity, source="API", actor_id=user.id))
+    session.add(AuditLog(actor_id=user.id, action="RESOURCE_UPDATED", entity_type="hospital_resource", entity_id=str(resource.id), payload={"version": resource.version}))
     session.commit()
     return resource_json(resource)
 
@@ -322,9 +340,13 @@ def update_resource_status(resource_id: UUID, payload: ResourceStatusUpdate, ses
     if resource is None:
         raise ApiError(404, ErrorCode.NOT_FOUND, "Hospital resource not found.")
     scoped_hospital(user, resource.hospital_id)
+    if payload.version != resource.version:
+        raise ApiError(409, ErrorCode.CONFLICT, "Resource state is newer than this client.")
     if payload.status not in {"ACTIVE", "INACTIVE"}:
         raise ApiError(422, ErrorCode.VALIDATION_ERROR, "Invalid resource status.")
     resource.status = payload.status
     resource.version += 1
+    session.add(ResourceEvent(hospital_resource_id=resource.id, event_type="STATUS_CHANGED", old_available=resource.available_capacity, new_available=resource.available_capacity, old_reserved=resource.reserved_capacity, new_reserved=resource.reserved_capacity, source="API", actor_id=user.id))
+    session.add(AuditLog(actor_id=user.id, action="RESOURCE_STATUS_CHANGED", entity_type="hospital_resource", entity_id=str(resource.id), payload={"status": resource.status}))
     session.commit()
     return resource_json(resource)

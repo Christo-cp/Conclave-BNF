@@ -47,9 +47,21 @@ def run_control(session: Session, settings, action: str, target_id: UUID | None 
             route.traffic_duration_seconds = value or route.traffic_duration_seconds + 300
             queue_event(session, "mission.route.updated", mission.id, mission.state_version, {"mission_id": str(mission.id), "traffic_duration_seconds": route.traffic_duration_seconds})
     elif action == "resource-lost":
-        resource = session.scalar(select(HospitalResource).order_by(HospitalResource.id))
+        resource = session.get(HospitalResource, target_id) if target_id else None
+        if resource is None and mission.selected_hospital_id:
+            resource = session.scalar(select(HospitalResource).where(HospitalResource.hospital_id == mission.selected_hospital_id).order_by(HospitalResource.resource_type))
         if resource:
-            resource.available_capacity = None
+            if resource.total_capacity <= 0:
+                raise ApiError(409, ErrorCode.CONFLICT, "Resource has no capacity to lose.")
+            resource.total_capacity -= 1
+            if resource.available_capacity is not None and resource.available_capacity > 0:
+                resource.available_capacity -= 1
+            elif resource.reserved_capacity > 0:
+                resource.reserved_capacity -= 1
+            elif resource.occupied_capacity > 0:
+                resource.occupied_capacity -= 1
+            else:
+                raise ApiError(409, ErrorCode.CONFLICT, "Resource has no counted capacity to lose.")
             resource.version += 1
             queue_event(session, "hospital.readiness.changed", resource.hospital_id, resource.version, {"hospital_id": str(resource.hospital_id), "resource": resource.resource_type, "available_capacity": None})
     elif action == "hospital-reject":

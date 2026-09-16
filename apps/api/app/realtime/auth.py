@@ -22,6 +22,8 @@ def websocket_user(session: Session, settings: Settings, token: str | None) -> U
 def can_subscribe(user: User, channel: str) -> bool:
     kind, _, identifier = channel.partition(":")
     roles = {role.code for role in user.roles}
+    if not identifier:
+        return False
     if kind in {"dispatcher", "incident", "mission"}:
         return bool(roles.intersection({"DISPATCHER", "SYSTEM_ADMIN", "DEMO_CONTROLLER"}))
     if kind == "hospital":

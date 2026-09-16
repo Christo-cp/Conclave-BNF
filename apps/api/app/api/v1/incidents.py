@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 
 from app.core.enums import Role
+from app.core.errors import ApiError, ErrorCode
 from app.db.models import Incident, PatientRequirement, User
 from app.dependencies import CurrentUser, Db, require_roles
 from app.schemas import IncidentCreate, RequirementCreate
@@ -26,7 +27,7 @@ def create(payload: IncidentCreate, session: Db, user: DispatcherUser):
 def get_incident(incident_id: UUID, session: Db, _: CurrentUser):
     incident = session.get(Incident, incident_id)
     if incident is None:
-        return {"error": "not found"}
+        raise ApiError(404, ErrorCode.NOT_FOUND, "Incident not found.")
     return incident_json(incident)
 
 

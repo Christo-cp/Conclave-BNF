@@ -5,20 +5,25 @@ from alembic import command
 from alembic.config import Config
 from argon2 import PasswordHasher
 from geoalchemy2.elements import WKTElement
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.db.models import (
     Ambulance,
+    AmbulanceAssignment,
     AmbulanceEquipment,
     Capability,
     Equipment,
     Hospital,
     HospitalCapability,
     HospitalResource,
+    Incident,
+    Mission,
     Notification,
+    PatientRequirement,
     Role,
+    SimulationScenario,
     User,
 )
 
@@ -38,7 +43,7 @@ def reset_and_seed(session: Session, settings: Settings) -> None:
     session.execute(
         text(
             "TRUNCATE TABLE "
-            "audit_logs, notifications, mission_events, reservations, "
+            "audit_logs, notifications, mission_events, simulation_events, simulation_scenarios, reservations, "
             "acceptance_requests, routes, missions, ambulance_assignments, "
             "patient_requirement_items, incidents, ambulance_equipment, "
             "hospital_resources, hospital_capabilities, equipment, capabilities, "
@@ -48,6 +53,7 @@ def reset_and_seed(session: Session, settings: Settings) -> None:
     )
     roles = [Role(code=code, name=code.replace("_", " ").title()) for code in ["DISPATCHER", "AMBULANCE_CREW", "HOSPITAL_STAFF", "HOSPITAL_ADMIN", "SYSTEM_ADMIN", "DEMO_CONTROLLER"]]
     session.add_all(roles)
+    seed_now = datetime(2026, 9, 12, 12, 30, tzinfo=UTC)
     hospital_rows = []
     for number in range(1, 11):
         hospital_rows.append(Hospital(hospital_code=f"H-{number:03d}", name=f"Simulated Hospital {number:03d}", location=WKTElement(f"POINT({76.95 + number / 1000} {10.0 + number / 1000})", srid=4326), latitude=10.0 + number / 1000, longitude=76.95 + number / 1000, status="ACTIVE", emergency_capable=True, data_mode="SIMULATED"))
@@ -62,7 +68,7 @@ def reset_and_seed(session: Session, settings: Settings) -> None:
     session.add_all(equipment)
     session.flush()
     for number in range(1, 11):
-        ambulance = Ambulance(ambulance_code=f"AMB-{number:03d}", vehicle_type="ALS", status="AVAILABLE" if number != 3 else "DISPATCHED", current_location=WKTElement(f"POINT({76.94 + number / 1000} {10.01 + number / 1000})", srid=4326), latitude=10.01 + number / 1000, longitude=76.94 + number / 1000, gps_updated_at=datetime.now(UTC) - timedelta(seconds=120 if number == 5 else 5), crew_summary={"level": "ALS"}, data_mode="SIMULATED", version=1)
+        ambulance = Ambulance(ambulance_code=f"AMB-{number:03d}", vehicle_type="ALS", status="AVAILABLE" if number != 3 else "DISPATCHED", current_location=WKTElement(f"POINT({76.94 + number / 1000} {10.01 + number / 1000})", srid=4326), latitude=10.01 + number / 1000, longitude=76.94 + number / 1000, gps_updated_at=seed_now - timedelta(seconds=120 if number == 5 else 5), crew_summary={"level": "ALS"}, data_mode="SIMULATED", version=1)
         session.add(ambulance)
         session.flush()
         for item in equipment[1:] if number == 1 else equipment:
@@ -78,10 +84,67 @@ def reset_and_seed(session: Session, settings: Settings) -> None:
                 continue
             session.add(HospitalCapability(hospital_id=hospital.id, capability_id=capability.id, status="ACTIVE"))
         if hospital.hospital_code in {"H-003", "H-004", "H-005"}:
-            session.add(HospitalResource(hospital_id=hospital.id, resource_type="ICU", total_capacity=1, available_capacity=1, reserved_capacity=0, occupied_capacity=0, status="ACTIVE", last_updated_at=datetime.now(UTC), version=1))
-            session.add(HospitalResource(hospital_id=hospital.id, resource_type="VENTILATOR", total_capacity=1, available_capacity=1, reserved_capacity=0, occupied_capacity=0, status="ACTIVE", last_updated_at=datetime.now(UTC), version=1))
+            session.add(HospitalResource(hospital_id=hospital.id, resource_type="ICU", total_capacity=1, available_capacity=1, reserved_capacity=0, occupied_capacity=0, status="ACTIVE", last_updated_at=seed_now, version=1))
+            session.add(HospitalResource(hospital_id=hospital.id, resource_type="VENTILATOR", total_capacity=1, available_capacity=1, reserved_capacity=0, occupied_capacity=0, status="ACTIVE", last_updated_at=seed_now, version=1))
         if hospital.hospital_code == "H-006":
-            session.add(HospitalResource(hospital_id=hospital.id, resource_type="ICU", total_capacity=1, available_capacity=0, reserved_capacity=0, occupied_capacity=1, status="ACTIVE", last_updated_at=datetime.now(UTC), version=1))
+            session.add(HospitalResource(hospital_id=hospital.id, resource_type="ICU", total_capacity=1, available_capacity=0, reserved_capacity=0, occupied_capacity=1, status="ACTIVE", last_updated_at=seed_now, version=1))
+        if hospital.hospital_code == "H-007":
+            session.add(HospitalResource(hospital_id=hospital.id, resource_type="ICU", total_capacity=1, available_capacity=None, reserved_capacity=0, occupied_capacity=0, status="ACTIVE", last_updated_at=seed_now, version=1))
+            session.add(HospitalResource(hospital_id=hospital.id, resource_type="VENTILATOR", total_capacity=1, available_capacity=1, reserved_capacity=0, occupied_capacity=0, status="ACTIVE", last_updated_at=seed_now, version=1))
+        if hospital.hospital_code == "H-008":
+            session.add(HospitalResource(hospital_id=hospital.id, resource_type="ICU", total_capacity=1, available_capacity=1, reserved_capacity=0, occupied_capacity=0, status="ACTIVE", last_updated_at=seed_now - timedelta(seconds=900), version=1))
+            session.add(HospitalResource(hospital_id=hospital.id, resource_type="VENTILATOR", total_capacity=1, available_capacity=1, reserved_capacity=0, occupied_capacity=0, status="ACTIVE", last_updated_at=seed_now, version=1))
+
+    dispatcher = users[0]
+    golden_incident = Incident(
+        incident_code="INC-000001",
+        incident_type="TRAUMA",
+        severity="CRITICAL",
+        location=WKTElement("POINT(76.95 10.0)", srid=4326),
+        latitude=10.0,
+        longitude=76.95,
+        address_text="Simulated Golden Incident",
+        patient_count=1,
+        notes="Deterministic A6 golden scenario.",
+        data_mode="SIMULATED",
+        status="CREATED",
+        created_by=dispatcher.id,
+    )
+    session.add(golden_incident)
+    session.flush()
+    session.add_all([
+        PatientRequirement(incident_id=golden_incident.id, requirement_code=code, level="REQUIRED")
+        for code in ("ICU", "TRAUMA", "VENTILATOR", "EMERGENCY_SURGERY")
+    ])
+    seeded_ambulance = session.scalar(select(Ambulance).where(Ambulance.ambulance_code == "AMB-003"))
+    if seeded_ambulance is None:
+        raise RuntimeError("Golden seed ambulance AMB-003 was not created.")
+    seeded_assignment = AmbulanceAssignment(incident_id=golden_incident.id, ambulance_id=seeded_ambulance.id, status="ASSIGNED", idempotency_key="seed-assignment-000001", assigned_by=dispatcher.id)
+    seeded_mission = Mission(mission_code="MSN-000001", incident_id=golden_incident.id, ambulance_id=seeded_ambulance.id, status="ASSIGNED", state_version=1)
+    session.add_all([seeded_assignment, seeded_mission])
+    crew = users[1]
+    crew.ambulance_id = seeded_ambulance.id
+    session.add(SimulationScenario(
+        scenario_code="GOLDEN_2026",
+        name="A6 golden scenario",
+        description="Deterministic synthetic ambulance and hospital routing inputs.",
+        initial_state={"incident_code": "INC-000001"},
+        configuration={
+            "default_ambulance_eta_s": 900,
+            "default_hospital_eta_s": 1800,
+            "ambulance_etas": {"AMB-001": 240, "AMB-002": 420, "AMB-003": 360, "AMB-004": 540, "AMB-005": 600},
+            "hospital_etas": {"H-001": 300, "H-002": 480, "H-003": 600, "H-004": 780, "H-005": 960, "H-006": 1080, "H-007": 1140, "H-008": 1200},
+            "routes": {
+                "default": {"distance_m": 10000, "duration_seconds": 1200, "traffic_duration_seconds": 1200, "confidence": 0.95},
+                "INC-000001:H-003": {"distance_m": 4200, "duration_seconds": 600, "traffic_duration_seconds": 600, "confidence": 0.95},
+                "INC-000001:H-004": {"distance_m": 5200, "duration_seconds": 780, "traffic_duration_seconds": 780, "confidence": 0.95},
+                "INC-000001:H-005": {"distance_m": 6400, "duration_seconds": 960, "traffic_duration_seconds": 960, "confidence": 0.95},
+            },
+        },
+        seed=2026,
+        status="READY",
+        created_at=seed_now,
+    ))
     session.add_all([
         Notification(
             event_type="AMBULANCE_UNAVAILABLE",
