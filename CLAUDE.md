@@ -135,6 +135,20 @@ automatically in this project; the owner performs manual browser verification.
   resources and rejected hospitals in the current acceptance chain.
 - Reservations are server-authoritative, row-locked, idempotent, and publish
   success events only after commit.
+- CORS is configured from `CORS_ORIGINS`; hold expiration runs from the API
+  lifespan scheduler and logs failures instead of silently swallowing them.
+- Resource lifecycle uses status/version transitions; destructive delete routes
+  are intentionally absent.
+- Frontend REST errors preserve the backend error-envelope message.
+- Frontend auth currently stores the demo JWT in localStorage. A `401` from the
+  shared API wrapper clears that token and sends the app to login via the
+  `conclave:auth-expired` event. Fresh login plus `/api/v1/ambulances` was
+  verified with HTTP 200 and 10 simulated records. Do not fix future 401s by
+  hiding errors or bypassing `current_user`.
+- Frontend auth currently stores the demo JWT in localStorage. Any `401` from
+  the shared API wrapper clears that token and sends the app to login via the
+  `conclave:auth-expired` event. This is a demo recovery path, not production
+  session security; production should use HTTP-only cookies.
 - S13 ML/voice is skipped because FR-023 and FR-032 lack approved data and no
   fabricated accuracy claim is allowed.
 

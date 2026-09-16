@@ -3,11 +3,11 @@ import type { Candidate, HospitalCandidate } from '../lib/api'
 import './decision-state.css'
 
 export type ViewState = 'idle' | 'loading' | 'success' | 'error' | 'stale'
-type Props = { title: string; candidates: (Candidate | HospitalCandidate)[]; state: ViewState; kind: 'ambulance' | 'hospital'; selectedCode?: string; onSelect: (candidate: Candidate | HospitalCandidate) => void }
+type Props = { title: string; candidates: (Candidate | HospitalCandidate)[]; state: ViewState; kind: 'ambulance' | 'hospital'; selectedCode?: string; onSelect: (candidate: Candidate | HospitalCandidate) => void; onRetry?: () => void }
 
-export function CandidateList({ title, candidates, state, kind, selectedCode, onSelect }: Props) {
+export function CandidateList({ title, candidates, state, kind, selectedCode, onSelect, onRetry }: Props) {
   if (state === 'loading') return <div className="candidate-state" role="status" aria-live="polite" aria-label={`${title} loading`}><div className="skeleton-row" /><div className="skeleton-row" /><div className="state-caption"><RefreshCw aria-hidden="true" className="spin" size={14} /> Analyzing compatible {kind}s...</div></div>
-  if (state === 'error') return <div className="candidate-state error" role="alert"><AlertTriangle size={21} /><strong>Matching service unavailable</strong><span>We could not retrieve a fresh recommendation. No assignment can be confirmed from an unavailable service.</span><button type="button">Retry</button></div>
+  if (state === 'error') return <div className="candidate-state error" role="alert"><AlertTriangle size={21} /><strong>Matching service unavailable</strong><span>We could not retrieve a fresh recommendation. No assignment can be confirmed from an unavailable service.</span>{onRetry && <button type="button" onClick={onRetry}>Retry</button>}</div>
   if (state === 'stale') return <div className="candidate-state stale" role="status" aria-live="polite"><Clock3 aria-hidden="true" size={21} /><strong>Showing stale recommendations</strong><span>Last known results are not confirmation. Refresh before assigning a resource.</span></div>
   if (state === 'idle') return <div className="candidate-state"><Database size={21} /><strong>Waiting for input</strong><span>Complete the previous step to evaluate candidates.</span></div>
   return <div className="candidate-list"><div className="candidate-list-heading"><span>{title}</span><span>{candidates.length} SCANNED · {candidates.filter((candidate) => candidate.eligible).length} ELIGIBLE</span></div>{candidates.map((candidate) => <CandidateRow key={candidate.code} candidate={candidate} kind={kind} selected={candidate.code === selectedCode} onSelect={onSelect} />)}</div>

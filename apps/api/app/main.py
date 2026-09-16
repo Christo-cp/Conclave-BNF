@@ -1,6 +1,7 @@
 """FastAPI application (plan S0)."""
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import (
     alerts,
@@ -12,9 +13,11 @@ from app.api.v1 import (
     resources,
     simulation,
 )
+from app.core.config import get_settings
 from app.core.errors import ApiError, api_error_handler
 from app.core.log import configure_logging
 from app.core.middleware import RequestContextMiddleware
+from app.lifespan import lifespan
 from app.realtime.websocket import router as websocket_router
 
 API_PREFIX = "/api/v1"
@@ -22,7 +25,9 @@ API_PREFIX = "/api/v1"
 
 def create_app() -> FastAPI:
     configure_logging()
-    app = FastAPI(title="Smart Ambulance API", openapi_url=f"{API_PREFIX}/openapi.json")
+    app = FastAPI(title="Smart Ambulance API", openapi_url=f"{API_PREFIX}/openapi.json", lifespan=lifespan)
+    settings = get_settings()
+    app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list, allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
     app.add_middleware(RequestContextMiddleware)
     app.add_exception_handler(ApiError, api_error_handler)
 

@@ -302,8 +302,8 @@ def accept_request(session: Session, actor: User, request_id: UUID, key: str) ->
         or actor.hospital_id != hospital.id
     ):
         raise ApiError(403, ErrorCode.AUTHORIZATION_ERROR, "Only staff of the target hospital may accept.")
-    if request.idempotency_key != key or request.status != "PENDING":
-        if request.status == "ACCEPTED" and request.idempotency_key == key:
+    if request.status != "PENDING":
+        if request.status == "ACCEPTED":
             return request
         raise ApiError(409, ErrorCode.CONFLICT, "Acceptance request is closed.")
     if request.expires_at <= datetime.now(UTC):

@@ -132,17 +132,6 @@ def update_ambulance(ambulance_id: UUID, payload: AmbulanceUpdate, session: Db, 
     return ambulance_json(item)
 
 
-@router.delete("/ambulances/{ambulance_id}")
-@router.delete("/resources/ambulances/{ambulance_id}", include_in_schema=False)
-def delete_ambulance(ambulance_id: UUID, session: Db, _: AdminUser):
-    item = session.get(Ambulance, ambulance_id)
-    if item is None:
-        raise ApiError(404, ErrorCode.NOT_FOUND, "Ambulance not found.")
-    session.delete(item)
-    session.commit()
-    return {"deleted": True, "id": str(ambulance_id)}
-
-
 @router.post("/ambulances/{ambulance_id}/location")
 @router.post("/resources/ambulances/{ambulance_id}/location", include_in_schema=False)
 def update_ambulance_location(ambulance_id: UUID, payload: LocationUpdate, session: Db, user: AmbulanceViewer):
@@ -225,18 +214,6 @@ def update_hospital(hospital_id: UUID, payload: HospitalUpdate, session: Db, use
         item.location = WKTElement(f"POINT({longitude} {latitude})", srid=4326)
     session.commit()
     return hospital_json(item)
-
-
-@router.delete("/hospitals/{hospital_id}")
-@router.delete("/resources/hospitals/{hospital_id}", include_in_schema=False)
-def delete_hospital(hospital_id: UUID, session: Db, user: AdminUser):
-    scoped_hospital(user, hospital_id)
-    item = session.get(Hospital, hospital_id)
-    if item is None:
-        raise ApiError(404, ErrorCode.NOT_FOUND, "Hospital not found.")
-    session.delete(item)
-    session.commit()
-    return {"deleted": True, "id": str(hospital_id)}
 
 
 @router.post("/hospitals/{hospital_id}/status")
@@ -334,17 +311,6 @@ def patch_resource(resource_id: UUID, payload: ResourceUpdate, session: Db, user
     session.add(AuditLog(actor_id=user.id, action="RESOURCE_UPDATED", entity_type="hospital_resource", entity_id=str(resource.id), payload={"version": resource.version}))
     session.commit()
     return resource_json(resource)
-
-
-@router.delete("/resources/{resource_id}")
-def delete_resource(resource_id: UUID, session: Db, user: AdminUser):
-    resource = session.get(HospitalResource, resource_id)
-    if resource is None:
-        raise ApiError(404, ErrorCode.NOT_FOUND, "Hospital resource not found.")
-    scoped_hospital(user, resource.hospital_id)
-    session.delete(resource)
-    session.commit()
-    return {"deleted": True, "id": str(resource_id)}
 
 
 @router.post("/resources/{resource_id}/status")
