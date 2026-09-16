@@ -7,12 +7,18 @@ export type AuthContext = {
   demoFallback: boolean
 }
 
+// Keys must cover the role codes the backend actually puts in the JWT
+// (app/simulation/seed.py): a code with no alias is dropped, and the user is
+// silently demoted to the dispatcher fallback workspace.
 const ROLE_ALIASES: Record<string, Role> = {
   dispatcher: 'DISPATCHER',
   hospital: 'HOSPITAL',
+  hospital_staff: 'HOSPITAL',
+  hospital_admin: 'HOSPITAL',
   ambulance: 'AMBULANCE_CREW',
   ambulance_crew: 'AMBULANCE_CREW',
   crew: 'AMBULANCE_CREW',
+  system_admin: 'DISPATCHER',
   demo: 'DEMO_CONTROLLER',
   demo_controller: 'DEMO_CONTROLLER',
 }
