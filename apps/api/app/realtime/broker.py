@@ -24,6 +24,23 @@ class EventEnvelope:
         return asdict(self)
 
 
+SCOPED_CHANNEL_KINDS = ("mission", "incident", "hospital", "ambulance")
+
+
+def channel_matches(channel: str, envelope: EventEnvelope) -> bool:
+    kind, _, identifier = channel.partition(":")
+    if not identifier:
+        return False
+    if kind == "dispatcher":
+        return identifier == "all"
+    if kind not in SCOPED_CHANNEL_KINDS:
+        return False
+    scoped = envelope.payload.get(f"{kind}_id")
+    if identifier == "all":
+        return scoped is not None
+    return identifier in {scoped, envelope.entity_id}
+
+
 class EventSubscription:
     def __init__(self, channels: set[str]) -> None:
         self.channels = channels
@@ -36,14 +53,9 @@ class EventSubscription:
             return False
         if envelope.entity_version < self._versions.get(envelope.entity_id, -1):
             return False
-        related = {
-            envelope.entity_id,
-            envelope.payload.get("mission_id"),
-            envelope.payload.get("incident_id"),
-            envelope.payload.get("hospital_id"),
-            envelope.payload.get("ambulance_id"),
-        }
-        return not self.channels or bool(self.channels.intersection(related))
+        if not self.channels:
+            return True
+        return any(channel_matches(channel, envelope) for channel in self.channels)
 
     async def put(self, envelope: EventEnvelope) -> None:
         if self.accepts(envelope):

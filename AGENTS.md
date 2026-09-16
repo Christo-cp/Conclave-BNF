@@ -125,6 +125,9 @@ Implemented in the current repository, with remaining S10-S15 gaps tracked in
   transition writes an audit row.
 - **API:** techspec's endpoint set under `/api/v1`; `Idempotency-Key` header on
   reservations; `X-Request-ID` and JSON logs on every request.
+- **Runtime hardening:** CORS reads `CORS_ORIGINS`; the lifespan scheduler runs
+  idempotent hold expiration and logs sweep failures without killing the API;
+  destructive resource delete endpoints are not part of the lifecycle API.
 
 **Current backend slice:** create incident → find ambulance → assign →
 calculate deterministic route → find hospital → acceptance/hold → reservation
@@ -224,6 +227,15 @@ pattern in surrounding code; if there is none, ask.
   OpenAPI, never hand-written.
 - **UI:** token values from `design.md`; every data view renders loading, error,
   stale and simulated states.
+- **Frontend API errors:** preserve the backend `{error:{message}}` envelope;
+  do not replace a specific server error with a generic message.
+- **Session expiry:** the shared frontend API wrapper clears stale tokens and
+  emits `conclave:auth-expired`; the app returns to login rather than retrying
+  protected requests with invalid credentials.
+- **Auth debugging:** `/ambulances` uses the shared API wrapper and
+  `Authorization: Bearer <JWT>` path. Trace token storage, runtime JWT settings,
+  database user lookup, and role scope before changing authentication; never
+  bypass the endpoint or replace its response with simulated data.
 
 ## 8. File & Folder Conventions
 

@@ -5,10 +5,11 @@ from sqlalchemy import select
 
 from app.core.enums import Role
 from app.core.errors import ApiError, ErrorCode
+from app.crew_service import apply_reroute, compare_routes, load_mission, mission_view
 from app.db.models import Mission, User
 from app.dependencies import CurrentUser, Db
 from app.mission_service import assign_destination
-from app.schemas import DestinationAssign, MissionPatch
+from app.schemas import DestinationAssign, MissionPatch, RerouteApply
 from app.services import patch_mission
 
 router = APIRouter(prefix="/missions", tags=["missions"])
@@ -27,8 +28,8 @@ def mission_json(item: Mission) -> dict:
 
 
 @router.get("")
-def list_missions(session: Db, _: CurrentUser):
-    return [mission_json(item) for item in session.scalars(select(Mission).order_by(Mission.created_at.desc()))]
+def list_missions(session: Db, user: CurrentUser):
+    return [mission_json(item) for item in session.scalars(select(Mission).order_by(Mission.created_at.desc())) if can_access_mission(user, item)]
 
 
 @router.get("/{mission_id}")
@@ -48,7 +49,29 @@ def patch(mission_id: UUID, payload: MissionPatch, session: Db, user: CurrentUse
         raise ApiError(404, ErrorCode.NOT_FOUND, "Mission not found.")
     if not can_access_mission(user, mission):
         raise ApiError(403, ErrorCode.AUTHORIZATION_ERROR, "Mission scope denied.")
-    return patch_mission(session, user, mission_id, payload.status, payload.state_version)
+    return mission_json(patch_mission(session, user, mission_id, payload.status, payload.state_version))
+
+
+def scoped_mission(session, user: User, mission_id: UUID) -> Mission:
+    mission = load_mission(session, mission_id)
+    if not can_access_mission(user, mission):
+        raise ApiError(403, ErrorCode.AUTHORIZATION_ERROR, "Mission scope denied.")
+    return mission
+
+
+@router.get("/{mission_id}/crew-view")
+def crew_view(mission_id: UUID, session: Db, user: CurrentUser):
+    return mission_view(session, scoped_mission(session, user, mission_id))
+
+
+@router.get("/{mission_id}/route-options")
+def route_options(mission_id: UUID, session: Db, user: CurrentUser):
+    return compare_routes(session, scoped_mission(session, user, mission_id))
+
+
+@router.post("/{mission_id}/reroute")
+def reroute(mission_id: UUID, payload: RerouteApply, session: Db, user: CurrentUser):
+    return apply_reroute(session, user, scoped_mission(session, user, mission_id), payload.variant, payload.state_version)
 
 
 @router.post("/{mission_id}/destination")

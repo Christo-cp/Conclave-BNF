@@ -36,6 +36,7 @@ from app.decision_engine.hospital import HospitalCandidate, evaluate_hospitals
 from app.decision_service import persist_decision
 from app.realtime.broker import queue_event
 from app.reservation_service import ReservationService
+from app.routing.geometry import as_json, simulated_path
 from app.routing.service import RoutingService
 
 ph = PasswordHasher()
@@ -184,7 +185,7 @@ def confirm_ambulance(session: Session, actor: User, ambulance_id: UUID, inciden
     return mission
 
 
-def calculate_route(session: Session, incident_id: UUID, hospital_id: UUID | None) -> Route:
+def calculate_route(session: Session, incident_id: UUID, hospital_id: UUID | None, variant: str = "primary") -> Route:
     incident = session.get(Incident, incident_id)
     hospital = session.get(Hospital, hospital_id) if hospital_id else None
     if not incident:
@@ -193,11 +194,18 @@ def calculate_route(session: Session, incident_id: UUID, hospital_id: UUID | Non
         raise ApiError(404, ErrorCode.NOT_FOUND, "Hospital not found.")
     if hospital is None:
         raise ApiError(409, ErrorCode.ROUTING_PROVIDER_ERROR, "A hospital destination is required for route calculation.")
-    estimate = RoutingService().calculate(golden_scenario(session), incident.incident_code, hospital.hospital_code)
-    route = Route(incident_id=incident_id, provider=estimate.provider, distance_m=estimate.distance_m, duration_seconds=estimate.duration_seconds, traffic_duration_seconds=estimate.traffic_duration_seconds, confidence=estimate.confidence, fallback_used=estimate.fallback_used, origin=WKTElement(f"POINT({incident.longitude} {incident.latitude})", srid=4326), destination=WKTElement(f"POINT({hospital.longitude} {hospital.latitude})", srid=4326))
+    estimate = RoutingService().calculate(golden_scenario(session), incident.incident_code, hospital.hospital_code, variant)
+    mission = session.scalar(select(Mission).where(Mission.incident_id == incident_id))
+    route = Route(incident_id=incident_id, mission_id=mission.id if mission else None, provider=estimate.provider, distance_m=estimate.distance_m, duration_seconds=estimate.duration_seconds, traffic_duration_seconds=estimate.traffic_duration_seconds, confidence=estimate.confidence, fallback_used=estimate.fallback_used, origin=WKTElement(f"POINT({incident.longitude} {incident.latitude})", srid=4326), destination=WKTElement(f"POINT({hospital.longitude} {hospital.latitude})", srid=4326))
+    attach_geometry(route, (incident.latitude, incident.longitude), (hospital.latitude, hospital.longitude), variant)
     session.add(route)
-    queue_event(session, "mission.route.updated", route.id, 1, {"incident_id": str(incident_id), "route_id": str(route.id)})
+    queue_event(session, "mission.route.updated", route.id, 1, {"incident_id": str(incident_id), "route_id": str(route.id), **({"mission_id": str(mission.id), "ambulance_id": str(mission.ambulance_id)} if mission else {})})
     session.commit()
+    return route
+
+
+def attach_geometry(route: Route, origin: tuple[float, float], destination: tuple[float, float], variant: str = "primary") -> Route:
+    route.geometry_points = simulated_path(origin, destination, variant=variant)
     return route
 
 
@@ -205,12 +213,15 @@ def route_json(route: Route) -> dict:
     return {
         "id": str(route.id),
         "incident_id": str(route.incident_id),
+        "mission_id": str(route.mission_id) if route.mission_id else None,
         "provider": route.provider,
         "distance_m": route.distance_m,
         "duration_seconds": route.duration_seconds,
         "traffic_duration_seconds": route.traffic_duration_seconds,
         "confidence": float(route.confidence),
         "fallback_used": route.fallback_used,
+        "geometry": as_json(getattr(route, "geometry_points", ()) or ()),
+        "data_mode": "SIMULATED",
     }
 
 
@@ -291,8 +302,8 @@ def accept_request(session: Session, actor: User, request_id: UUID, key: str) ->
         or actor.hospital_id != hospital.id
     ):
         raise ApiError(403, ErrorCode.AUTHORIZATION_ERROR, "Only staff of the target hospital may accept.")
-    if request.idempotency_key != key or request.status != "PENDING":
-        if request.status == "ACCEPTED" and request.idempotency_key == key:
+    if request.status != "PENDING":
+        if request.status == "ACCEPTED":
             return request
         raise ApiError(409, ErrorCode.CONFLICT, "Acceptance request is closed.")
     if request.expires_at <= datetime.now(UTC):
@@ -351,6 +362,6 @@ def patch_mission(session: Session, actor: User, mission_id: UUID, status: str, 
         incident = session.get(Incident, mission.incident_id)
         if incident:
             incident.status = IncidentStatus.IN_TRANSIT
-    queue_event(session, "mission.state.changed", mission.id, mission.state_version, {"mission_id": str(mission.id), "status": target.value})
+    queue_event(session, "mission.state.changed", mission.id, mission.state_version, {"mission_id": str(mission.id), "ambulance_id": str(mission.ambulance_id), "incident_id": str(mission.incident_id), "status": target.value})
     session.commit()
     return mission

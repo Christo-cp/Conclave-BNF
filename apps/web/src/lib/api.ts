@@ -11,6 +11,16 @@ export interface ResourceSnapshot { code?: string; resource_type?: string; total
 export interface AmbulanceRecord { id: string; ambulance_code: string; vehicle_type: string; status: string; latitude?: number | null; longitude?: number | null; gps_updated_at?: string | null; crew_summary?: Record<string, string> | null; data_mode: DataMode; version: number }
 export interface HospitalRecord { id: string; hospital_code: string; name: string; latitude: number; longitude: number; status: string; emergency_capable: boolean; data_mode: DataMode; capabilities?: { code: string; status: string }[]; resources?: ResourceSnapshot[] }
 export interface AlertRecord { id: string; incident_id?: string | null; type: string; severity: string; message: string; payload: Record<string, unknown>; created_at: string; status: string; data_mode: DataMode }
+export interface GeoPoint { lat: number; lng: number }
+export type GpsState = 'FRESH' | 'STALE' | 'UNKNOWN'
+export interface CrewMission { id: string; mission_code: string; status: string; state_version: number; active_leg: 'TO_PATIENT' | 'TO_HOSPITAL'; next_states: string[]; data_mode: DataMode }
+export interface CrewIncident { id: string; incident_code: string; incident_type: string; severity: string; address_text?: string | null; patient_count: number; point: GeoPoint | null; requirements: { code: string; level: string }[] }
+export interface CrewAmbulance { id: string; ambulance_code: string; status: string; point: GeoPoint | null; gps_age_s: number | null; gps_stale: boolean | null; gps_state: GpsState }
+export interface CrewDestination { id: string; hospital_code: string; name: string; point: GeoPoint | null }
+export interface CrewRoute { id: string; distance_m: number; duration_seconds: number; traffic_duration_seconds: number; confidence: number; provider: string; geometry: GeoPoint[]; data_mode: DataMode }
+export interface CrewView { mission: CrewMission; assignment: { id: string; status: string } | null; incident: CrewIncident | null; ambulance: CrewAmbulance | null; destination: CrewDestination | null; acceptance: { id: string; status: string } | null; reservations: { id: string; status: string; resource_type: string | null }[]; route: CrewRoute | null }
+export interface RouteOption { variant: string; label: string; distance_m: number; duration_seconds: number; traffic_duration_seconds: number; confidence: number; provider: string; data_mode: DataMode; geometry: GeoPoint[]; route_id?: string }
+export interface RouteComparison { mission_id: string; active_leg: string; current: RouteOption | null; alternatives: RouteOption[]; recommended_variant: string | null; saving_seconds: number | null; significant: boolean; threshold_seconds: number; data_mode: DataMode }
 export class ApiError extends Error {
   status: number
 
@@ -22,7 +32,7 @@ export class ApiError extends Error {
 }
 
 const TOKEN_KEY = 'conclave_access_token'
-async function request<T>(path: string, init?: RequestInit): Promise<T> { const headers = new Headers(init?.headers); headers.set('Content-Type', 'application/json'); const token = api.getToken(); if (token) headers.set('Authorization', `Bearer ${token}`); const response = await fetch(`/api/v1${path}`, { ...init, headers }); const body = await response.json().catch(() => null) as { detail?: string; message?: string } | null; if (!response.ok) throw new ApiError(response.status, body?.detail ?? body?.message ?? `Request failed (${response.status})`); return body as T }
+async function request<T>(path: string, init?: RequestInit): Promise<T> { const headers = new Headers(init?.headers); headers.set('Content-Type', 'application/json'); const token = api.getToken(); if (token) headers.set('Authorization', `Bearer ${token}`); const response = await fetch(`/api/v1${path}`, { ...init, headers }); const body = await response.json().catch(() => null) as { detail?: string; message?: string; error?: { message?: string } } | null; if (response.status === 401) { api.clearToken(); window.dispatchEvent(new Event('conclave:auth-expired')) } if (!response.ok) throw new ApiError(response.status, body?.error?.message ?? body?.detail ?? body?.message ?? `Request failed (${response.status})`); return body as T }
 function idempotencyKey() { return `web-${crypto.randomUUID()}` }
 
 export const api = {
@@ -53,6 +63,13 @@ export const api = {
     }
     return request<{ mode: string }>(`/admin/simulation/${paths[action] ?? action}`, { method: 'POST', body: JSON.stringify({}) })
   },
+  missions: () => request<Mission[]>('/missions'),
+  crewView: (missionId: string) => request<CrewView>(`/missions/${missionId}/crew-view`),
+  routeOptions: (missionId: string) => request<RouteComparison>(`/missions/${missionId}/route-options`),
+  reroute: (missionId: string, variant: string, stateVersion: number) => request<{ mission_id: string; state_version: number; applied: RouteOption }>(`/missions/${missionId}/reroute`, { method: 'POST', body: JSON.stringify({ variant, state_version: stateVersion }) }),
+  acceptAssignment: (assignmentId: string) => request<{ id: string; status: string }>(`/ambulance-assignments/${assignmentId}/accept`, { method: 'POST' }),
+  rejectAssignment: (assignmentId: string) => request<{ id: string; status: string }>(`/ambulance-assignments/${assignmentId}/reject`, { method: 'POST' }),
+  updateAmbulanceLocation: (ambulanceId: string, lat: number, lng: number) => request<AmbulanceRecord>(`/ambulances/${ambulanceId}/location`, { method: 'POST', body: JSON.stringify({ latitude: lat, longitude: lng }) }),
   ambulances: () => request<AmbulanceRecord[]>('/ambulances'),
   hospitals: () => request<HospitalRecord[]>('/hospitals'),
   getHospital: (hospitalId: string) => request<HospitalRecord>(`/hospitals/${hospitalId}`),
