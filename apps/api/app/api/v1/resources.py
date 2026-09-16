@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from geoalchemy2.elements import WKTElement
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.core.enums import AmbulanceStatus, HospitalStatus, Role
 from app.core.errors import ApiError, ErrorCode
 from app.db.models import (
@@ -15,10 +16,12 @@ from app.db.models import (
     Hospital,
     HospitalCapability,
     HospitalResource,
+    Mission,
     ResourceEvent,
     User,
 )
 from app.dependencies import Db, require_roles
+from app.realtime.broker import queue_event
 from app.schemas import (
     AmbulanceCreate,
     AmbulanceStatusUpdate,
@@ -56,8 +59,16 @@ def can_view_hospital(user: User, hospital_id: UUID) -> None:
     scoped_hospital(user, hospital_id)
 
 
+CLOSED_MISSION_STATES = ("COMPLETED", "CANCELLED", "FAILED")
+
+
+def gps_age_seconds(item: Ambulance) -> float | None:
+    return None if item.gps_updated_at is None else (datetime.now(UTC) - item.gps_updated_at).total_seconds()
+
+
 def ambulance_json(item: Ambulance) -> dict:
-    return {"id": str(item.id), "ambulance_code": item.ambulance_code, "vehicle_type": item.vehicle_type, "status": item.status, "latitude": float(item.latitude) if item.latitude is not None else None, "longitude": float(item.longitude) if item.longitude is not None else None, "gps_updated_at": item.gps_updated_at, "crew_summary": item.crew_summary, "data_mode": item.data_mode, "version": item.version}
+    age = gps_age_seconds(item)
+    return {"id": str(item.id), "ambulance_code": item.ambulance_code, "vehicle_type": item.vehicle_type, "status": item.status, "latitude": float(item.latitude) if item.latitude is not None else None, "longitude": float(item.longitude) if item.longitude is not None else None, "gps_updated_at": item.gps_updated_at, "gps_age_s": age, "gps_stale": None if age is None else age > get_settings().gps_stale_after_s, "crew_summary": item.crew_summary, "data_mode": item.data_mode, "version": item.version}
 
 
 def hospital_json(item: Hospital) -> dict:
@@ -146,6 +157,8 @@ def update_ambulance_location(ambulance_id: UUID, payload: LocationUpdate, sessi
     item.current_location = WKTElement(f"POINT({payload.longitude} {payload.latitude})", srid=4326)
     item.gps_updated_at = datetime.now(UTC)
     item.version += 1
+    mission = session.scalar(select(Mission).where(Mission.ambulance_id == item.id, Mission.status.notin_(CLOSED_MISSION_STATES)).order_by(Mission.created_at.desc()))
+    queue_event(session, "ambulance.location.updated", item.id, item.version, {"ambulance_id": str(item.id), "latitude": payload.latitude, "longitude": payload.longitude, **({"mission_id": str(mission.id), "incident_id": str(mission.incident_id)} if mission else {})})
     session.commit()
     return ambulance_json(item)
 

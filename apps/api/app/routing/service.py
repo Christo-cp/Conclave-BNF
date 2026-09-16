@@ -6,11 +6,14 @@ class RoutingService:
     def __init__(self, provider: MockRoutingProvider | None = None) -> None:
         self.provider = provider or MockRoutingProvider()
 
-    def calculate(self, scenario: dict, origin_code: str, destination_code: str) -> RouteEstimate:
+    def calculate(self, scenario: dict, origin_code: str, destination_code: str, variant: str = "primary") -> RouteEstimate:
         try:
-            return self.provider.calculate(scenario, origin_code, destination_code)
+            return self.provider.calculate(scenario, origin_code, destination_code, variant)
         except LookupError as exc:
             raise ApiError(409, ErrorCode.ROUTING_PROVIDER_ERROR, "No simulated route is available.") from exc
+
+    def variants(self, scenario: dict, origin_code: str, destination_code: str) -> list[str]:
+        return self.provider.variants(scenario, origin_code, destination_code)
 
     def ambulance_eta(self, scenario: dict, ambulance_code: str) -> int:
         try:

@@ -136,6 +136,11 @@ class MissionPatch(BaseModel):
     state_version: int
 
 
+class RerouteApply(BaseModel):
+    variant: str
+    state_version: int
+
+
 class JsonResponse(BaseModel):
     id: UUID
 

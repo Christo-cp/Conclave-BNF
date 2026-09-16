@@ -135,10 +135,26 @@ def reset_and_seed(session: Session, settings: Settings) -> None:
             "ambulance_etas": {"AMB-001": 240, "AMB-002": 420, "AMB-003": 360, "AMB-004": 540, "AMB-005": 600},
             "hospital_etas": {"H-001": 300, "H-002": 480, "H-003": 600, "H-004": 780, "H-005": 960, "H-006": 1080, "H-007": 1140, "H-008": 1200},
             "routes": {
-                "default": {"distance_m": 10000, "duration_seconds": 1200, "traffic_duration_seconds": 1200, "confidence": 0.95},
-                "INC-000001:H-003": {"distance_m": 4200, "duration_seconds": 600, "traffic_duration_seconds": 600, "confidence": 0.95},
-                "INC-000001:H-004": {"distance_m": 5200, "duration_seconds": 780, "traffic_duration_seconds": 780, "confidence": 0.95},
-                "INC-000001:H-005": {"distance_m": 6400, "duration_seconds": 960, "traffic_duration_seconds": 960, "confidence": 0.95},
+                "default": {
+                    "distance_m": 10000, "duration_seconds": 1200, "traffic_duration_seconds": 1200, "confidence": 0.95,
+                    "alternatives": {"alternative": {"distance_m": 11800, "duration_seconds": 1080, "traffic_duration_seconds": 1080, "confidence": 0.9}},
+                },
+                "AMB-003:INC-000001": {
+                    "distance_m": 2800, "duration_seconds": 360, "traffic_duration_seconds": 360, "confidence": 0.95,
+                    "alternatives": {"alternative": {"distance_m": 3400, "duration_seconds": 300, "traffic_duration_seconds": 300, "confidence": 0.9}},
+                },
+                "INC-000001:H-003": {
+                    "distance_m": 4200, "duration_seconds": 600, "traffic_duration_seconds": 600, "confidence": 0.95,
+                    "alternatives": {"alternative": {"distance_m": 5100, "duration_seconds": 540, "traffic_duration_seconds": 540, "confidence": 0.9}},
+                },
+                "INC-000001:H-004": {
+                    "distance_m": 5200, "duration_seconds": 780, "traffic_duration_seconds": 780, "confidence": 0.95,
+                    "alternatives": {"alternative": {"distance_m": 6000, "duration_seconds": 720, "traffic_duration_seconds": 720, "confidence": 0.9}},
+                },
+                "INC-000001:H-005": {
+                    "distance_m": 6400, "duration_seconds": 960, "traffic_duration_seconds": 960, "confidence": 0.95,
+                    "alternatives": {"alternative": {"distance_m": 7300, "duration_seconds": 900, "traffic_duration_seconds": 900, "confidence": 0.9}},
+                },
             },
         },
         seed=2026,

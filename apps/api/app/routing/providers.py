@@ -11,12 +11,13 @@ class RouteEstimate:
     provider: str
     data_mode: str
     fallback_used: bool = False
+    variant: str = "primary"
 
 
 class RoutingProvider(Protocol):
     name: str
 
-    def calculate(self, scenario: dict, origin_code: str, destination_code: str) -> RouteEstimate:
+    def calculate(self, scenario: dict, origin_code: str, destination_code: str, variant: str = "primary") -> RouteEstimate:
         ...
 
     def ambulance_eta(self, scenario: dict, ambulance_code: str) -> int:
@@ -29,11 +30,15 @@ class RoutingProvider(Protocol):
 class MockRoutingProvider:
     name = "mock"
 
-    def calculate(self, scenario: dict, origin_code: str, destination_code: str) -> RouteEstimate:
+    def calculate(self, scenario: dict, origin_code: str, destination_code: str, variant: str = "primary") -> RouteEstimate:
         routes = scenario.get("routes", {})
         route = routes.get(f"{origin_code}:{destination_code}") or routes.get(destination_code) or routes.get("default")
         if not route:
             raise LookupError("No simulated route is defined for this pair.")
+        if variant != "primary":
+            route = (route.get("alternatives") or {}).get(variant)
+            if not route:
+                raise LookupError(f"No simulated {variant} route is defined for this pair.")
         return RouteEstimate(
             distance_m=int(route["distance_m"]),
             duration_seconds=int(route["duration_seconds"]),
@@ -41,7 +46,13 @@ class MockRoutingProvider:
             confidence=float(route["confidence"]),
             provider=self.name,
             data_mode="SIMULATED",
+            variant=variant,
         )
+
+    def variants(self, scenario: dict, origin_code: str, destination_code: str) -> list[str]:
+        routes = scenario.get("routes", {})
+        route = routes.get(f"{origin_code}:{destination_code}") or routes.get(destination_code) or routes.get("default")
+        return ["primary", *sorted(route.get("alternatives") or {})] if route else []
 
     def ambulance_eta(self, scenario: dict, ambulance_code: str) -> int:
         try:

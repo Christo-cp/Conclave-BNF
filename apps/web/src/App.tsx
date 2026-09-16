@@ -25,7 +25,8 @@ import {
 import { api, ApiError, type AlertRecord, type AmbulanceRecord, type Candidate, type HospitalRecord, type Incident, type HospitalCandidate, type RouteResult } from './lib/api'
 import { CandidateList, type ViewState } from './components/decision-state'
 import './App.css'
-import { DemoControllerScreen, HospitalScreen, AmbulanceScreen } from './RoleScreens'
+import { DemoControllerScreen, HospitalScreen } from './RoleScreens'
+import { CrewWorkspace } from './CrewScreens'
 import { getAuthContext, rolePath } from './lib/auth'
 
 type Screen = 'login' | 'new' | 'detail'
@@ -52,7 +53,7 @@ function App() {
   if (role !== 'DISPATCHER' && role !== 'DEMO_CONTROLLER' && location.pathname === '/') return <Navigate to={rolePath(role)} replace />
   if (role === 'DEMO_CONTROLLER' && location.pathname === '/') return <Navigate to="/demo" replace />
   if (location.pathname === '/hospital' && role === 'HOSPITAL') return <RoleShell auth={auth}><HospitalScreen /></RoleShell>
-  if (location.pathname === '/ambulance' && role === 'AMBULANCE_CREW') return <RoleShell auth={auth}><AmbulanceScreen /></RoleShell>
+  if ((location.pathname === '/ambulance' || location.pathname.startsWith('/ambulance/')) && role === 'AMBULANCE_CREW') return <RoleShell auth={auth}><CrewWorkspace /></RoleShell>
   if (location.pathname === '/demo' && role === 'DEMO_CONTROLLER') return <RoleShell auth={auth}><DemoControllerScreen /></RoleShell>
   if (location.pathname === '/ambulances') return <RoleShell auth={auth}><AmbulanceFleetScreen /></RoleShell>
   if (location.pathname === '/hospitals') return <RoleShell auth={auth}><HospitalNetworkScreen /></RoleShell>
