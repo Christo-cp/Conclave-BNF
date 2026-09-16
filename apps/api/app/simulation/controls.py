@@ -33,19 +33,22 @@ def run_control(session: Session, settings, action: str, target_id: UUID | None 
         session.commit()
         return {"action": action, "mode": "SIMULATED"}
     mission = _mission(session, target_id)
+    # Crew clients may only subscribe to ambulance:<id>, so every mission-scoped event must carry it.
+    scope = {"mission_id": str(mission.id), "ambulance_id": str(mission.ambulance_id), "incident_id": str(mission.incident_id)}
     if action == "scenario/start":
-        queue_event(session, "simulation.started", mission.id, mission.state_version, {"mission_id": str(mission.id)})
+        queue_event(session, "simulation.started", mission.id, mission.state_version, scope)
     elif action == "heartbeat":
         ambulance = session.get(Ambulance, mission.ambulance_id)
         if ambulance:
             ambulance.gps_updated_at = datetime.now(UTC)
             ambulance.version += 1
-            queue_event(session, "ambulance.location.updated", ambulance.id, ambulance.version, {"mission_id": str(mission.id), "ambulance_id": str(ambulance.id), "latitude": float(ambulance.latitude), "longitude": float(ambulance.longitude)})
+            queue_event(session, "ambulance.location.updated", ambulance.id, ambulance.version, {**scope, "latitude": float(ambulance.latitude), "longitude": float(ambulance.longitude)})
     elif action == "traffic-change":
         route = session.scalar(select(Route).where(Route.mission_id == mission.id).order_by(Route.created_at.desc()))
-        if route:
-            route.traffic_duration_seconds = value or route.traffic_duration_seconds + 300
-            queue_event(session, "mission.route.updated", mission.id, mission.state_version, {"mission_id": str(mission.id), "traffic_duration_seconds": route.traffic_duration_seconds})
+        if route is None:
+            raise ApiError(409, ErrorCode.CONFLICT, "No route has been calculated for this mission yet.")
+        route.traffic_duration_seconds = value or route.traffic_duration_seconds + 300
+        queue_event(session, "mission.route.updated", mission.id, mission.state_version, {**scope, "traffic_duration_seconds": route.traffic_duration_seconds})
     elif action == "resource-lost":
         resource = session.get(HospitalResource, target_id) if target_id else None
         if resource is None and mission.selected_hospital_id:
@@ -63,22 +66,22 @@ def run_control(session: Session, settings, action: str, target_id: UUID | None 
             else:
                 raise ApiError(409, ErrorCode.CONFLICT, "Resource has no counted capacity to lose.")
             resource.version += 1
-            queue_event(session, "hospital.readiness.changed", resource.hospital_id, resource.version, {"hospital_id": str(resource.hospital_id), "resource": resource.resource_type, "available_capacity": None})
+            queue_event(session, "hospital.readiness.changed", resource.hospital_id, resource.version, {**scope, "hospital_id": str(resource.hospital_id), "resource": resource.resource_type, "available_capacity": None})
     elif action == "hospital-reject":
-        queue_event(session, "hospital.rejected", mission.id, mission.state_version, {"mission_id": str(mission.id), "reason": "SIMULATED_REJECTION"})
+        queue_event(session, "hospital.rejected", mission.id, mission.state_version, {**scope, "reason": "SIMULATED_REJECTION"})
     elif action == "ambulance-failure":
         ambulance = session.get(Ambulance, mission.ambulance_id)
         if ambulance:
             ambulance.status = "UNAVAILABLE"
             ambulance.version += 1
-            queue_event(session, "ambulance.status.changed", ambulance.id, ambulance.version, {"mission_id": str(mission.id), "ambulance_id": str(ambulance.id), "status": ambulance.status})
+            queue_event(session, "ambulance.status.changed", ambulance.id, ambulance.version, {**scope, "status": ambulance.status})
     elif action == "gps-lost":
         ambulance = session.get(Ambulance, mission.ambulance_id)
         if ambulance:
             ambulance.gps_updated_at = None
             ambulance.version += 1
-            queue_event(session, "ambulance.status.changed", ambulance.id, ambulance.version, {"mission_id": str(mission.id), "ambulance_id": str(ambulance.id), "status": "GPS_LOST"})
+            queue_event(session, "ambulance.status.changed", ambulance.id, ambulance.version, {**scope, "status": "GPS_LOST"})
     elif action == "route-blocked":
-        queue_event(session, "mission.route.updated", mission.id, mission.state_version, {"mission_id": str(mission.id), "blocked": True})
+        queue_event(session, "mission.route.updated", mission.id, mission.state_version, {**scope, "blocked": True})
     session.commit()
     return {"action": action, "mission_id": str(mission.id), "mode": "SIMULATED"}

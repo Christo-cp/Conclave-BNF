@@ -76,4 +76,4 @@ def reroute(mission_id: UUID, payload: RerouteApply, session: Db, user: CurrentU
 
 @router.post("/{mission_id}/destination")
 def destination(mission_id: UUID, payload: DestinationAssign, session: Db, user: CurrentUser):
-    return assign_destination(session, user.id, mission_id, payload.hospital_id, payload.reservation_id)
+    return mission_json(assign_destination(session, user.id, mission_id, payload.hospital_id, payload.reservation_id))

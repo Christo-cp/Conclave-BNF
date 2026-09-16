@@ -29,6 +29,10 @@
 .crew-status { font: 700 20px/1.25 var(--display); display: flex; align-items: center; gap: 9px; }
 .crew-note { color: var(--dim); font: 12px/1.6 var(--mono); display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 
+.crew-label { color: var(--dim); font: 10px var(--mono); letter-spacing: .13em; text-transform: uppercase; }
+.crew-input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface-soft); color: var(--text); font: 12px/1.6 var(--mono); resize: vertical; }
+.crew-input:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+
 .crew-actions { display: flex; flex-wrap: wrap; gap: 9px; }
 .crew-button { min-height: 44px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface-raised); color: var(--text); font: 11px var(--mono); letter-spacing: .12em; cursor: pointer; }
 .crew-button:disabled { opacity: .5; cursor: not-allowed; }

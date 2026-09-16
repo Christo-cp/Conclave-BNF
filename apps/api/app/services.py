@@ -199,9 +199,15 @@ def calculate_route(session: Session, incident_id: UUID, hospital_id: UUID | Non
     route = Route(incident_id=incident_id, mission_id=mission.id if mission else None, provider=estimate.provider, distance_m=estimate.distance_m, duration_seconds=estimate.duration_seconds, traffic_duration_seconds=estimate.traffic_duration_seconds, confidence=estimate.confidence, fallback_used=estimate.fallback_used, origin=WKTElement(f"POINT({incident.longitude} {incident.latitude})", srid=4326), destination=WKTElement(f"POINT({hospital.longitude} {hospital.latitude})", srid=4326))
     attach_geometry(route, (incident.latitude, incident.longitude), (hospital.latitude, hospital.longitude), variant)
     session.add(route)
+    session.flush()  # the id is a Python-side default, so it is None until flush and the event would carry "None"
     queue_event(session, "mission.route.updated", route.id, 1, {"incident_id": str(incident_id), "route_id": str(route.id), **({"mission_id": str(mission.id), "ambulance_id": str(mission.ambulance_id)} if mission else {})})
     session.commit()
     return route
+
+
+def mission_scope(mission: Mission | None) -> dict:
+    """Crew clients subscribe on ambulance_id, so mission-scoped events must carry it."""
+    return {} if mission is None else {"mission_id": str(mission.id), "ambulance_id": str(mission.ambulance_id)}
 
 
 def attach_geometry(route: Route, origin: tuple[float, float], destination: tuple[float, float], variant: str = "primary") -> Route:
@@ -283,7 +289,7 @@ def hold_acceptance(session: Session, actor: User, incident_id: UUID, hospital_i
         resource.version += 1
         session.add(Reservation(reservation_code=f"RES-{session.query(Reservation).count()+1:06d}", acceptance_request_id=request.id, incident_id=incident_id, hospital_id=hospital_id, hospital_resource_id=resource.id, expires_at=expires))
     audit(session, actor.id, "RESOURCE_HELD", "acceptance_request", str(request.id))
-    queue_event(session, "resource.reserved", request.id, 1, {"incident_id": str(incident_id), "hospital_id": str(hospital_id)})
+    queue_event(session, "resource.reserved", request.id, 1, {"incident_id": str(incident_id), "hospital_id": str(hospital_id), **mission_scope(session.scalar(select(Mission).where(Mission.incident_id == incident_id)))})
     session.commit()
     return request
 
@@ -317,6 +323,7 @@ def accept_request(session: Session, actor: User, request_id: UUID, key: str) ->
     for reservation in session.scalars(select(Reservation).where(Reservation.acceptance_request_id == request.id).with_for_update()):
         reservation.status = "CONFIRMED"
     incident = session.get(Incident, request.incident_id)
+    mission = None
     if incident:
         incident.status = IncidentStatus.RESOURCE_RESERVED
         mission = session.scalar(select(Mission).where(Mission.incident_id == incident.id).with_for_update())
@@ -326,7 +333,7 @@ def accept_request(session: Session, actor: User, request_id: UUID, key: str) ->
             session.add(MissionEvent(mission_id=mission.id, incident_id=incident.id, event_type="DESTINATION_CHANGED", payload={"to_hospital_id": str(request.hospital_id)}, actor_id=actor.id))
             session.add(Notification(incident_id=incident.id, event_type="DESTINATION_CHANGED", payload={"mission_id": str(mission.id), "hospital_id": str(request.hospital_id)}))
     audit(session, actor.id, "HOSPITAL_ACCEPTED", "acceptance_request", str(request.id))
-    queue_event(session, "hospital.accepted", request.id, 1, {"incident_id": str(request.incident_id), "hospital_id": str(request.hospital_id)})
+    queue_event(session, "hospital.accepted", request.id, 1, {"incident_id": str(request.incident_id), "hospital_id": str(request.hospital_id), **mission_scope(mission)})
     session.commit()
     return request
 

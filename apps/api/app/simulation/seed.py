@@ -31,6 +31,34 @@ PASSWORD = "demo-password-change-me"
 ph = PasswordHasher()
 
 
+AMBULANCE_LEGS = {"AMB-001": (1900, 240), "AMB-002": (3300, 420), "AMB-003": (2800, 360), "AMB-004": (4300, 540), "AMB-005": (4800, 600), "AMB-006": (5200, 660), "AMB-007": (5600, 720), "AMB-008": (6100, 780), "AMB-009": (6600, 840), "AMB-010": (7000, 900)}
+HOSPITAL_LEGS = {"H-003": (4200, 600), "H-004": (5200, 780), "H-005": (6400, 960)}
+ALTERNATIVE_SAVING_S = 150
+ALTERNATIVE_MIN_DURATION_S = 330
+
+
+def declared_route(distance_m: int, duration_seconds: int) -> dict:
+    """One declared simulated route, with an alternative only where a shorter one is plausible.
+
+    The saving must clear `reroute_significant_delta_s` or the reroute prompt can never
+    fire; legs too short for a credible alternative declare none rather than invent one.
+    """
+    route = {"distance_m": distance_m, "duration_seconds": duration_seconds, "traffic_duration_seconds": duration_seconds, "confidence": 0.95}
+    if duration_seconds >= ALTERNATIVE_MIN_DURATION_S:
+        alternative_duration = duration_seconds - ALTERNATIVE_SAVING_S
+        route["alternatives"] = {"alternative": {"distance_m": round(distance_m * 1.18), "duration_seconds": alternative_duration, "traffic_duration_seconds": alternative_duration, "confidence": 0.9}}
+    return route
+
+
+def scenario_routes() -> dict:
+    routes = {"default": declared_route(10000, 1200)}
+    for code, (distance_m, duration_seconds) in AMBULANCE_LEGS.items():
+        routes[f"{code}:INC-000001"] = declared_route(distance_m, duration_seconds)
+    for code, (distance_m, duration_seconds) in HOSPITAL_LEGS.items():
+        routes[f"INC-000001:{code}"] = declared_route(distance_m, duration_seconds)
+    return routes
+
+
 def migrate(database_url: str) -> None:
     config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
     config.attributes["database_url"] = database_url
@@ -134,28 +162,7 @@ def reset_and_seed(session: Session, settings: Settings) -> None:
             "default_hospital_eta_s": 1800,
             "ambulance_etas": {"AMB-001": 240, "AMB-002": 420, "AMB-003": 360, "AMB-004": 540, "AMB-005": 600},
             "hospital_etas": {"H-001": 300, "H-002": 480, "H-003": 600, "H-004": 780, "H-005": 960, "H-006": 1080, "H-007": 1140, "H-008": 1200},
-            "routes": {
-                "default": {
-                    "distance_m": 10000, "duration_seconds": 1200, "traffic_duration_seconds": 1200, "confidence": 0.95,
-                    "alternatives": {"alternative": {"distance_m": 11800, "duration_seconds": 1080, "traffic_duration_seconds": 1080, "confidence": 0.9}},
-                },
-                "AMB-003:INC-000001": {
-                    "distance_m": 2800, "duration_seconds": 360, "traffic_duration_seconds": 360, "confidence": 0.95,
-                    "alternatives": {"alternative": {"distance_m": 3400, "duration_seconds": 300, "traffic_duration_seconds": 300, "confidence": 0.9}},
-                },
-                "INC-000001:H-003": {
-                    "distance_m": 4200, "duration_seconds": 600, "traffic_duration_seconds": 600, "confidence": 0.95,
-                    "alternatives": {"alternative": {"distance_m": 5100, "duration_seconds": 540, "traffic_duration_seconds": 540, "confidence": 0.9}},
-                },
-                "INC-000001:H-004": {
-                    "distance_m": 5200, "duration_seconds": 780, "traffic_duration_seconds": 780, "confidence": 0.95,
-                    "alternatives": {"alternative": {"distance_m": 6000, "duration_seconds": 720, "traffic_duration_seconds": 720, "confidence": 0.9}},
-                },
-                "INC-000001:H-005": {
-                    "distance_m": 6400, "duration_seconds": 960, "traffic_duration_seconds": 960, "confidence": 0.95,
-                    "alternatives": {"alternative": {"distance_m": 7300, "duration_seconds": 900, "traffic_duration_seconds": 900, "confidence": 0.9}},
-                },
-            },
+            "routes": scenario_routes(),
         },
         seed=2026,
         status="READY",

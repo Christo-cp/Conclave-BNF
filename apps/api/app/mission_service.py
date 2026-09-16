@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.enums import MissionStatus, ReservationStatus
 from app.core.errors import ApiError, ErrorCode
 from app.db.models import AuditLog, Mission, MissionEvent, Notification, Reservation
+from app.realtime.broker import queue_event
 
 MISSION_TRANSITIONS = {
     MissionStatus.ASSIGNED: {MissionStatus.EN_ROUTE_TO_PATIENT},
@@ -34,6 +35,7 @@ def assign_destination(session: Session, actor_id: UUID, mission_id: UUID, hospi
     session.add(MissionEvent(mission_id=mission.id, incident_id=mission.incident_id, event_type="DESTINATION_CHANGED", payload=payload, actor_id=actor_id))
     session.add(Notification(incident_id=mission.incident_id, event_type="DESTINATION_CHANGED", payload={"mission_id": str(mission.id), **payload}))
     session.add(AuditLog(actor_id=actor_id, action="DESTINATION_CHANGED", entity_type="mission", entity_id=str(mission.id), payload=payload))
+    queue_event(session, "mission.destination.changed", mission.id, mission.state_version, {"mission_id": str(mission.id), "ambulance_id": str(mission.ambulance_id), "incident_id": str(mission.incident_id), "hospital_id": str(hospital_id)})
     session.commit()
     return mission
 

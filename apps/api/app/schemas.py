@@ -141,6 +141,10 @@ class RerouteApply(BaseModel):
     state_version: int
 
 
+class AssignmentReject(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
 class JsonResponse(BaseModel):
     id: UUID
 

@@ -149,8 +149,11 @@ def update_ambulance_location(ambulance_id: UUID, payload: LocationUpdate, sessi
     item = session.get(Ambulance, ambulance_id)
     if item is None:
         raise ApiError(404, ErrorCode.NOT_FOUND, "Ambulance not found.")
-    if "AMBULANCE_CREW" in role_codes(user) and item.status not in {AmbulanceStatus.DISPATCHED, AmbulanceStatus.RESERVED}:
-        raise ApiError(403, ErrorCode.AUTHORIZATION_ERROR, "Crew cannot update this ambulance.")
+    if "AMBULANCE_CREW" in role_codes(user):
+        if user.ambulance_id != item.id:
+            raise ApiError(403, ErrorCode.AUTHORIZATION_ERROR, "Crew may only update their own ambulance.")
+        if item.status not in {AmbulanceStatus.DISPATCHED, AmbulanceStatus.RESERVED}:
+            raise ApiError(403, ErrorCode.AUTHORIZATION_ERROR, "Crew cannot update this ambulance.")
     if payload.version is not None and payload.version != item.version:
         raise ApiError(409, ErrorCode.CONFLICT, "Ambulance state is newer than this client.")
     item.latitude, item.longitude = payload.latitude, payload.longitude

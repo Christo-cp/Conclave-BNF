@@ -83,6 +83,21 @@ def current_route(session: Session, mission: Mission) -> Route | None:
     return session.scalar(select(Route).where(Route.mission_id == mission.id).order_by(Route.created_at.desc()))
 
 
+def route_variant_for_leg(scenario: dict, origin_code: str, destination_code: str, route: Route) -> str | None:
+    """Which declared variant a persisted route is, or None when it belongs to the other leg.
+
+    The Route row records no variant, so it is recovered by matching the scenario's
+    declared options. Free-flow duration is compared rather than traffic duration
+    because the traffic-change control mutates the latter on the persisted row.
+    """
+    routing = RoutingService()
+    for variant in routing.variants(scenario, origin_code, destination_code):
+        estimate = routing.calculate(scenario, origin_code, destination_code, variant)
+        if estimate.distance_m == route.distance_m and estimate.duration_seconds == route.duration_seconds:
+            return variant
+    return None
+
+
 def estimate_json(estimate, origin, destination, *, label: str) -> dict:
     return {
         "variant": estimate.variant,
@@ -105,13 +120,17 @@ def mission_view(session: Session, mission: Mission) -> dict:
     acceptance = session.scalar(select(AcceptanceRequest).where(AcceptanceRequest.incident_id == mission.incident_id).order_by(AcceptanceRequest.created_at.desc()))
     reservations = list(session.scalars(select(Reservation).where(Reservation.incident_id == mission.incident_id))) if hospital else []
     assignment = session.scalar(select(AmbulanceAssignment).where(AmbulanceAssignment.incident_id == mission.incident_id, AmbulanceAssignment.ambulance_id == mission.ambulance_id).order_by(AmbulanceAssignment.created_at.desc()))
-    route = current_route(session, mission)
     leg = active_leg(mission)
+    route = current_route(session, mission)
     geometry: list[dict] = []
+    origin_code, destination_code, origin, destination = _safe_endpoints(session, mission)
     if route is not None:
-        _, _, origin, destination = _safe_endpoints(session, mission)
-        if origin and destination:
-            geometry = as_json(simulated_path(origin, destination, variant="primary"))
+        # A route calculated for the other leg must not be reported against this one.
+        variant = route_variant_for_leg(golden_scenario(session), origin_code, destination_code, route) if origin_code else None
+        if variant is None:
+            route = None
+        elif origin and destination:
+            geometry = as_json(simulated_path(origin, destination, variant=variant))
     return {
         "mission": {
             "id": str(mission.id),
@@ -180,16 +199,19 @@ def compare_routes(session: Session, mission: Mission) -> dict:
     scenario = golden_scenario(session)
     routing = RoutingService()
     active = current_route(session, mission)
+    active_variant = route_variant_for_leg(scenario, origin_code, destination_code, active) if active is not None else None
+    current_variant = active_variant or "primary"
     options: list[dict] = []
     for variant in routing.variants(scenario, origin_code, destination_code):
         estimate = routing.calculate(scenario, origin_code, destination_code, variant)
-        option = estimate_json(estimate, origin, destination, label="CURRENT ROUTE" if variant == "primary" else "ALTERNATIVE ROUTE")
-        if variant == "primary" and active is not None:
+        is_current = variant == current_variant
+        option = estimate_json(estimate, origin, destination, label="CURRENT ROUTE" if is_current else "ALTERNATIVE ROUTE")
+        if is_current and active_variant is not None:
             option["traffic_duration_seconds"] = active.traffic_duration_seconds
             option["route_id"] = str(active.id)
         options.append(option)
-    current = next((option for option in options if option["variant"] == "primary"), None)
-    alternatives = [option for option in options if option["variant"] != "primary"]
+    current = next((option for option in options if option["variant"] == current_variant), None)
+    alternatives = [option for option in options if option["variant"] != current_variant]
     best = min(alternatives, key=lambda option: option["traffic_duration_seconds"], default=None)
     delta = None if not (current and best) else current["traffic_duration_seconds"] - best["traffic_duration_seconds"]
     threshold = get_settings().reroute_significant_delta_s

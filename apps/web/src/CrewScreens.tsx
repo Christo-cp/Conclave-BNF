@@ -7,6 +7,7 @@ import { RealtimeClient, realtimeUrl } from './lib/realtime'
 import './CrewScreens.css'
 
 const CACHE_KEY = 'conclave_crew_view'
+const CLOSED_STATES = new Set(['COMPLETED', 'CANCELLED', 'FAILED'])
 
 type Connection = 'LIVE' | 'DEGRADED'
 
@@ -59,14 +60,16 @@ export function CrewWorkspace() {
   const [busy, setBusy] = useState(false)
   const [ticking, setTicking] = useState(false)
   const tickIndex = useRef(0)
+  const replayPath = useRef<GeoPoint[]>([])
 
   const load = useCallback(async (id?: string) => {
     try {
       let target = id ?? missionId
       if (!target) {
         const missions = await api.missions()
-        if (missions.length === 0) { setError('No mission is assigned to this ambulance.'); setConnection('LIVE'); return }
-        target = missions[0].id
+        const active = missions.find((item) => !CLOSED_STATES.has(item.status))
+        if (!active) { setError('No active mission is assigned to this ambulance.'); setConnection('LIVE'); return }
+        target = active.id
         setMissionId(target)
       }
       const next = await api.crewView(target)
@@ -108,12 +111,12 @@ export function CrewWorkspace() {
     try { await api.patchMission(view.mission.id, target, view.mission.state_version); await load() } catch (cause) { setError(cause instanceof ApiError ? cause.message : 'The mission state could not be updated.') } finally { setBusy(false) }
   }
 
-  async function respond(accepted: boolean) {
+  async function respond(accepted: boolean, reason = '') {
     if (!view?.assignment) return
     setBusy(true)
     try {
       if (accepted) await api.acceptAssignment(view.assignment.id)
-      else await api.rejectAssignment(view.assignment.id)
+      else await api.rejectAssignment(view.assignment.id, reason)
       await load()
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : 'The assignment response could not be recorded.') } finally { setBusy(false) }
   }
@@ -124,16 +127,24 @@ export function CrewWorkspace() {
     try { await api.reroute(view.mission.id, option.variant, view.mission.state_version); await load(); await refreshOptions() } catch (cause) { setError(cause instanceof ApiError ? cause.message : 'The reroute could not be applied.') } finally { setBusy(false) }
   }
 
+  function toggleReplay(next: boolean) {
+    // The server regenerates the curve from the moved ambulance on every tick, so the
+    // path is frozen at start and walked once; re-reading it would never reach the end.
+    if (next) { replayPath.current = geometry; tickIndex.current = 0 }
+    setTicking(next)
+  }
+
   useEffect(() => {
-    if (!ticking || !view?.ambulance?.id || geometry.length === 0) return
-    const ambulanceId = view.ambulance.id
+    const ambulanceId = view?.ambulance?.id
+    if (!ticking || !ambulanceId || replayPath.current.length === 0) return
     const timer = window.setInterval(() => {
-      tickIndex.current = (tickIndex.current + 1) % geometry.length
-      const point = geometry[tickIndex.current]
+      tickIndex.current += 1
+      const point = replayPath.current[tickIndex.current]
+      if (!point) { setTicking(false); return }
       void api.updateAmbulanceLocation(ambulanceId, point.lat, point.lng).catch(() => setConnection('DEGRADED'))
     }, 3000)
     return () => window.clearInterval(timer)
-  }, [ticking, view?.ambulance?.id, geometry])
+  }, [ticking, view?.ambulance?.id])
 
   if (!view) {
     return <div className="crew-shell"><div className="crew-empty"><Ambulance size={30} /><h2>No mission loaded</h2><p>{error ?? 'Loading the assigned mission from the command service.'}</p><button className="crew-button" type="button" onClick={() => void load()}><RefreshCw size={15} /> RETRY</button></div></div>
@@ -165,7 +176,7 @@ export function CrewWorkspace() {
 
       {panel === '/ambulance' && <OverviewPanel view={view} busy={busy} onRespond={respond} onAdvance={advance} />}
       {panel === '/ambulance/mission' && <MissionPanel view={view} />}
-      {panel === '/ambulance/navigation' && <NavigationPanel view={view} geometry={geometry} alternative={alternative} options={options} busy={busy} ticking={ticking} onTick={setTicking} onAdvance={advance} onReroute={applyReroute} />}
+      {panel === '/ambulance/navigation' && <NavigationPanel view={view} geometry={geometry} alternative={alternative} options={options} busy={busy} ticking={ticking} onTick={toggleReplay} onAdvance={advance} onReroute={applyReroute} />}
       {panel === '/ambulance/patient' && <PatientPanel view={view} busy={busy} onAdvance={advance} />}
       {panel === '/ambulance/hospital' && <HospitalPanel view={view} busy={busy} onAdvance={advance} />}
     </div>
@@ -177,14 +188,24 @@ function NextActions({ view, busy, onAdvance }: { view: CrewView; busy: boolean;
   return <div className="crew-actions">{view.mission.next_states.map((state) => <button key={state} className="crew-button primary" type="button" disabled={busy} onClick={() => onAdvance(state)}>{STATE_LABELS[state] ?? state.replaceAll('_', ' ')} <ArrowRight size={16} /></button>)}</div>
 }
 
-function OverviewPanel({ view, busy, onRespond, onAdvance }: { view: CrewView; busy: boolean; onRespond: (accepted: boolean) => void; onAdvance: (target: string) => void }) {
+function OverviewPanel({ view, busy, onRespond, onAdvance }: { view: CrewView; busy: boolean; onRespond: (accepted: boolean, reason?: string) => void; onAdvance: (target: string) => void }) {
+  const [rejecting, setRejecting] = useState(false)
+  const [reason, setReason] = useState('')
   const pending = view.assignment?.status === 'ASSIGNED'
   return <div className="crew-grid">
     <section className="crew-card">
       <h2>Assignment</h2>
       {view.assignment ? <>
         <p className="crew-status">{view.assignment.status.replaceAll('_', ' ')}</p>
-        {pending && <div className="crew-actions"><button className="crew-button primary" type="button" disabled={busy} onClick={() => onRespond(true)}><Check size={16} /> ACCEPT</button><button className="crew-button danger" type="button" disabled={busy} onClick={() => onRespond(false)}><X size={16} /> REJECT</button></div>}
+        {pending && !rejecting && <div className="crew-actions"><button className="crew-button primary" type="button" disabled={busy} onClick={() => onRespond(true)}><Check size={16} /> ACCEPT</button><button className="crew-button danger" type="button" disabled={busy} onClick={() => setRejecting(true)}><X size={16} /> REJECT</button></div>}
+        {pending && rejecting && <>
+          <label className="crew-label" htmlFor="reject-reason">Rejection reason (required)</label>
+          <textarea id="reject-reason" className="crew-input" rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why can this unit not take the mission?" />
+          <div className="crew-actions">
+            <button className="crew-button danger" type="button" disabled={busy || reason.trim().length === 0} onClick={() => onRespond(false, reason.trim())}><X size={16} /> CONFIRM REJECTION</button>
+            <button className="crew-button" type="button" disabled={busy} onClick={() => { setRejecting(false); setReason('') }}>CANCEL</button>
+          </div>
+        </>}
       </> : <p className="crew-note">No assignment record is attached to this mission.</p>}
     </section>
     <section className="crew-card">

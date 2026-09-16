@@ -15,6 +15,7 @@ from app.reservation_service import ReservationService
 from app.schemas import (
     AcceptanceCreate,
     AcceptanceReject,
+    AssignmentReject,
     ConfirmAmbulanceRequest,
     MatchRequest,
     ReservationAction,
@@ -39,6 +40,10 @@ ReservationUser = Annotated[User, Depends(require_roles(Role.HOSPITAL_STAFF, Rol
 
 def reservation_json(item: Reservation) -> dict:
     return {"id": str(item.id), "reservation_code": item.reservation_code, "acceptance_request_id": str(item.acceptance_request_id), "incident_id": str(item.incident_id), "hospital_id": str(item.hospital_id), "hospital_resource_id": str(item.hospital_resource_id), "status": item.status, "expires_at": item.expires_at, "release_reason": item.release_reason}
+
+
+def assignment_json(item: AmbulanceAssignment) -> dict:
+    return {"id": str(item.id), "incident_id": str(item.incident_id), "ambulance_id": str(item.ambulance_id), "status": item.status}
 
 
 def acceptance_json(item: AcceptanceRequest) -> dict:
@@ -73,15 +78,15 @@ def accept_assignment(assignment_id: UUID, session: Db, user: Annotated[User, De
     assignment = session.get(AmbulanceAssignment, assignment_id)
     if assignment is None or (Role.AMBULANCE_CREW.value in {role.code for role in user.roles} and user.ambulance_id != assignment.ambulance_id):
         raise ApiError(403, ErrorCode.AUTHORIZATION_ERROR, "Ambulance assignment scope denied.")
-    return respond_to_assignment(session, user.id, assignment_id, True)
+    return assignment_json(respond_to_assignment(session, user.id, assignment_id, True))
 
 
 @router.post("/ambulance-assignments/{assignment_id}/reject")
-def reject_assignment(assignment_id: UUID, session: Db, user: Annotated[User, Depends(require_roles(Role.AMBULANCE_CREW, Role.SYSTEM_ADMIN))]):
+def reject_assignment(assignment_id: UUID, payload: AssignmentReject, session: Db, user: Annotated[User, Depends(require_roles(Role.AMBULANCE_CREW, Role.SYSTEM_ADMIN))]):
     assignment = session.get(AmbulanceAssignment, assignment_id)
     if assignment is None or (Role.AMBULANCE_CREW.value in {role.code for role in user.roles} and user.ambulance_id != assignment.ambulance_id):
         raise ApiError(403, ErrorCode.AUTHORIZATION_ERROR, "Ambulance assignment scope denied.")
-    return respond_to_assignment(session, user.id, assignment_id, False)
+    return assignment_json(respond_to_assignment(session, user.id, assignment_id, False, payload.reason))
 
 
 @router.post("/routes/calculate")
@@ -96,12 +101,12 @@ def hospital_match(payload: MatchRequest, session: Db, _: Dispatcher):
 
 @router.post("/acceptance-requests")
 def acceptance(payload: AcceptanceCreate, session: Db, user: Dispatcher, settings: Annotated[Settings, Depends(get_settings)], idempotency_key: Annotated[str, Header(alias="Idempotency-Key")]):
-    return hold_acceptance(session, user, payload.incident_id, payload.hospital_id, idempotency_key, settings)
+    return acceptance_json(hold_acceptance(session, user, payload.incident_id, payload.hospital_id, idempotency_key, settings))
 
 
 @router.post("/acceptance-requests/{request_id}/accept")
 def accept(request_id: UUID, session: Db, user: HospitalResponder, idempotency_key: Annotated[str, Header(alias="Idempotency-Key")]):
-    return accept_request(session, user, request_id, idempotency_key)
+    return acceptance_json(accept_request(session, user, request_id, idempotency_key))
 
 
 @router.get("/acceptance-requests/{request_id}")
