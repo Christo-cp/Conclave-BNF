@@ -3,12 +3,12 @@
 Instructions for any AI coding agent working in this folder. Read this file
 completely before touching anything.
 
-> **No application code exists yet.** The folder holds six specifications, a
-> build plan the user has not signed off, and agent tooling — no git
-> repository, package manifest, test suite or runnable app. Everything marked
-> **(planned)** comes from the specs or the plan and is not on disk. Check
-> reality (`ls`, and `git status` once a repository exists) before acting on it; when reality and this file
-> disagree, reality wins — say so and update this file in the same change.
+> **Application code exists.** The repository contains a FastAPI/PostGIS backend,
+> React/Vite frontend, migrations through `0018_decision_trace_fields`, tests,
+> scripts, and deterministic synthetic seed data. Sections marked **(planned)**
+> describe remaining S1-S15 work, not absent scaffolding. Check reality (`git
+> status` and the current source) before acting; when this file and the code
+> disagree, reality wins and update this file in the same change.
 
 **Authority.** This file states the rules. `CLAUDE.md` (Claude Code) and the
 `SKILL.md` files under `.claude/skills/` must agree with it; they add
@@ -51,7 +51,7 @@ Exists today:
 | `prd.md` `plan.md` `appflow.md` `design.md` `database.md` `techspec.md` | The six specs, ~450 KB together | **Never** — read-only |
 | `docs/executable-plan.md` | Build plan S0–S15 with per-step tests and exit checks | Only when the user asks |
 | `docs/spec-digest/` | Human-facing digest of the specs | No; don't load it for lookups |
-| `STATUS.md` | Current state, ≤ 60 lines | Only via the handoff procedure (§10) |
+| `STATUS.md` | Current state, verification, known gaps | Only via the handoff procedure (§10) |
 | `handoffs/` | Session handoffs | Add new files only |
 | `AGENTS.md` | This file | Yes, without asking, only to match verified reality (new scripts, the generated layout) in the same change. Any change to a rule needs the user's OK |
 | `CLAUDE.md` | Claude Code instructions | Only to keep it consistent with this file, with the user's OK |
@@ -77,32 +77,36 @@ docker-compose.yml     Only if P1 = Docker
 ## 3. Tech Stack
 
 Specified in tech:498-560; plan S0 names the packages but pins no library
-versions. **Nothing is installed in the project yet.**
+versions. The current implementation uses the installed toolchain documented in
+`STATUS.md` and the repository manifests.
 
 | Layer | Specified | Notes |
 |---|---|---|
-| Frontend **(planned)** | React, TypeScript, Vite, Tailwind CSS, TanStack Query, Zustand, React Router, React Hook Form, Zod, Lucide React, Recharts | pnpm workspace |
-| Backend **(planned)** | Python 3.12 (uv), FastAPI, Pydantic + pydantic-settings, SQLAlchemy ≥ 2, Alembic, WebSockets, psycopg, GeoAlchemy2, PyJWT, argon2-cffi | Built with hatchling, package `app` |
-| Database **(planned)** | PostgreSQL 16 + PostGIS, `pgcrypto` | Runtime (Docker or native) is decision P1 |
+| Frontend | React, TypeScript, Vite, Tailwind CSS, React Router, Lucide React, Vitest, Playwright | pnpm workspace in `apps/web` |
+| Backend | Python 3.12, FastAPI, SQLAlchemy 2, Alembic, WebSockets, psycopg, GeoAlchemy2, PyJWT, argon2-cffi | Package `app` in `apps/api` |
+| Database | PostgreSQL 16 + PostGIS, `pgcrypto` | Docker runtime per P1 |
 | Optimisation | Google OR-Tools, "only where actually useful" (tech:539-542) | Optional |
 | ML | XGBoost / LightGBM, scikit-learn | Optional, S13 only; plan sets `ML_ENABLED=false` |
-| Testing **(planned)** | Pytest, httpx, Vitest, React Testing Library, jsdom, Playwright; Ruff (lint), mypy | |
+| Testing | Pytest, httpx, Vitest, React Testing Library, jsdom, Playwright; Ruff | Current tests are under `apps/api/tests` and `apps/web/src` |
 | Maps / routing | Decision P2 (plan recommends a deterministic mock provider plus Mapbox) | |
 | Formatter, deployment target, CI | **Unknown** — not specified | Ask before choosing |
 
 Never add a technology, service or provider the specs don't list — including an
 LLM API — without the user's explicit decision.
 
-## 4. Architecture & Key Components (planned)
+## 4. Architecture & Key Components
 
-Not implemented. These are binding design rules from the specs.
+Implemented in the current repository, with remaining S10-S15 gaps tracked in
+`STATUS.md` and the newest handoff.
 
 - **Three separated layers** (tech:570-579): deterministic rules → optimisation
   → prediction. Hard constraints filter candidates **before** scoring on
   **every** path — match, recalculation, override, voice. An ineligible
   candidate is never scored.
 - **No business or decision logic in React components or FastAPI route
-  handlers** (tech:6966). Planned homes (plan Part D): `ambulance_matcher`,
+  handlers** (tech:6966). Current homes include `decision_engine`, service
+  modules, `routing`, `sweeper`, `realtime`, and `core`; planned homes from
+  Part D remain targets for later extraction where needed: `ambulance_matcher`,
   `hospital_matcher`, `IncidentService`, `AcceptanceService`,
   `ReservationService`, `MissionService`, `ReassessmentService`,
   `RoutingService` with pluggable providers, `core/security`, `freshness.py`,
@@ -122,9 +126,11 @@ Not implemented. These are binding design rules from the specs.
 - **API:** techspec's endpoint set under `/api/v1`; `Idempotency-Key` header on
   reservations; `X-Request-ID` and JSON logs on every request.
 
-**First vertical slice**, built before anything else (plan:4696-4716, plan
-S0–S10): create incident → find ambulance → assign → calculate route → find
-hospital → accept → reserve ICU, surfaced through WebSocket to the dispatcher UI.
+**Current backend slice:** create incident → find ambulance → assign →
+calculate deterministic route → find hospital → acceptance/hold → reservation
+and destination transitions, with post-commit realtime infrastructure. The
+complete browser acceptance/reservation flow and several S10-S15 screens remain
+partial; do not claim the full vertical slice is complete.
 
 ## 5. Development Setup
 
@@ -138,7 +144,7 @@ numbers repeat the real spec's, so cite lines, never "§N". Details:
 **safety › prd › techspec › database › plan › appflow › design.** Grep the
 conflict register first; if the row is marked DECIDE, ask the user.
 
-**Toolchain required (planned)** — verify each with `--version`; never assume
+**Toolchain required** — verify each with `--version`; never assume
 it is installed:
 
 | Tool | Requirement |
@@ -149,8 +155,8 @@ it is installed:
 | PostgreSQL 16 + PostGIS | Docker image `postgis/postgis:16-3.5`, or a native install — per P1 |
 | git | Repository created in S0 |
 
-**Setup is gated.** Do not run S0 until P1 is decided and the user has signed
-off the plan (check `STATUS.md`).
+**Setup is complete for P1.** Docker PostGIS uses `postgis/postgis:16-3.5`.
+Future build-step work still follows the S1-S15 order and `STATUS.md`.
 
 The S0 commands are only in `docs/executable-plan.md` lines 347-400, and they
 are deliberately not copied here: the plan is unsigned, and a second copy would
@@ -160,16 +166,15 @@ drift. Two details there matter:
 
 ## 6. Build, Run & Test Commands
 
-**None of these can run today.** They are plan A2's commands, unverified
-against real code. Once `package.json` or `pyproject.toml` defines scripts,
-those win; update this table in the same change.
+These commands are verified against the current repository. If a package
+manifest defines a newer command, update this table in the same change.
 
 PowerShell, from the project root, after
 `$py = ".\apps\api\.venv\Scripts\python.exe"`. In a POSIX shell such as Git
 Bash, use forward slashes and call `apps/api/.venv/Scripts/python.exe`
 directly.
 
-| Purpose | Command (planned) |
+| Purpose | Command |
 |---|---|
 | Migrate | `& $py -m alembic -c apps\api\alembic.ini upgrade head` |
 | Reset and seed demo data | `& $py scripts\reset_demo.py` |
@@ -182,7 +187,7 @@ directly.
 | E2E | `pnpm --dir apps/web exec playwright test <spec>` |
 | Generate API types | `pnpm --dir apps/web exec openapi-typescript http://127.0.0.1:8000/api/v1/openapi.json -o src/lib/api/schema.d.ts` — the app sets FastAPI's `openapi_url` to this path (tech:5125; user decision 2026-09-13). Open the URL first to confirm |
 
-**Full suite (planned)** — what "run the full suite" means in §13. Run all of it
+**Full suite** — what "run the full suite" means in §13. Run all of it
 from the project root, not only the files you changed.
 
 - **No tests yet.** Skip a runner while no test file of its kind exists, and
@@ -263,6 +268,24 @@ change that breaks one is wrong regardless of test results.
     pitch (plan:5257-5281).
 
 ## 10. AI Agent Workflow
+
+## Project Memory Maintenance
+
+This repository uses `AGENTS.md` as the canonical plural agent-instruction
+file; there is no competing `AGENT.md`.
+
+Before coding:
+1. Read `AGENTS.md`, `STATUS.md`, and `CLAUDE.md`.
+2. Read the relevant executable-plan/spec slices, architecture decisions, source,
+   and tests.
+
+After meaningful changes:
+1. Update `STATUS.md` with the verified current state, tests, blockers, and gaps.
+2. Update `AGENTS.md` when durable agent rules, commands, or architecture change.
+3. Update `CLAUDE.md` when durable architecture, domain workflow, API, role, or
+   current-context information changes.
+
+Never leave the project-memory files stale and never claim unverified completion.
 
 1. **Orient.** Read `STATUS.md` and the newest handoff; verify them against
    reality; report any drift; confirm with the user which item to start.

@@ -36,7 +36,7 @@ def test_invalid_mission_transition_is_rejected(db_session):
     db_session.flush()
     mission = Mission(
         id=uuid4(),
-        mission_code="MSN-000001",
+        mission_code=f"MSN-{uuid4().hex[:8]}",
         incident_id=incident.id,
         ambulance_id=ambulance.id,
         status=MissionStatus.CREATED,

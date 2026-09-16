@@ -44,7 +44,7 @@ export class RealtimeClient {
     if (this.stopped) return
     try {
       this.socket = new WebSocket(this.url)
-      this.socket.onopen = () => { this.retry = 0 }
+       this.socket.onopen = () => { this.retry = 0; this.socket?.send(JSON.stringify({ action: 'subscribe', channels: ['dispatcher:all'] })) }
       this.socket.onmessage = (message) => this.receive(message.data)
       this.socket.onclose = () => this.reconnect()
       this.socket.onerror = () => this.socket?.close()

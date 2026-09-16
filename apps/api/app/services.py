@@ -7,7 +7,7 @@ from geoalchemy2.elements import WKTElement
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 from app.core.enums import IncidentStatus, MissionStatus
 from app.core.errors import ApiError, ErrorCode
 from app.db.models import (
@@ -28,11 +28,15 @@ from app.db.models import (
     PatientRequirement,
     Reservation,
     Route,
+    SimulationScenario,
     User,
 )
 from app.decision_engine.ambulance import AmbulanceCandidate, evaluate_ambulances
 from app.decision_engine.hospital import HospitalCandidate, evaluate_hospitals
+from app.decision_service import persist_decision
 from app.realtime.broker import queue_event
+from app.reservation_service import ReservationService
+from app.routing.service import RoutingService
 
 ph = PasswordHasher()
 
@@ -44,6 +48,13 @@ def ambulance_equipment_requirements(requirements: set[str]) -> set[str]:
         "OXYGEN": "OXYGEN",
     }
     return {mapping[requirement] for requirement in requirements if requirement in mapping}
+
+
+def golden_scenario(session: Session) -> dict:
+    scenario = session.scalar(select(SimulationScenario).where(SimulationScenario.status == "READY").order_by(SimulationScenario.scenario_code))
+    if scenario is None:
+        raise ApiError(409, ErrorCode.ROUTING_PROVIDER_ERROR, "No simulated scenario is available.")
+    return scenario.configuration
 
 
 def incident_json(incident: Incident) -> dict:
@@ -121,11 +132,15 @@ def match_ambulances(session: Session, incident_id: UUID, settings: Settings) ->
         {item.requirement_code for item in requirements if item.level == "PREFERRED"}
     )
     ambulances = list(session.scalars(select(Ambulance).order_by(Ambulance.ambulance_code)))
+    active_mission_ambulances = set(session.scalars(select(Mission.ambulance_id).where(Mission.status.not_in({MissionStatus.COMPLETED, MissionStatus.CANCELLED, MissionStatus.FAILED}))))
+    routing = RoutingService()
+    scenario = golden_scenario(session)
     candidates = []
     for ambulance in ambulances:
         equipment = {code for code, in session.execute(select(Equipment.code).join(AmbulanceEquipment, AmbulanceEquipment.equipment_id == Equipment.id).where(AmbulanceEquipment.ambulance_id == ambulance.id, AmbulanceEquipment.quantity > 0))}
-        candidates.append(AmbulanceCandidate(ambulance.ambulance_code, 420 + int(ambulance.ambulance_code[-3:]), ambulance.status, ambulance.gps_updated_at, frozenset(equipment), False))
+        candidates.append(AmbulanceCandidate(ambulance.ambulance_code, routing.ambulance_eta(scenario, ambulance.ambulance_code), ambulance.status, ambulance.gps_updated_at, frozenset(equipment), ambulance.id in active_mission_ambulances))
     result = evaluate_ambulances(candidates, required, preferred, datetime.now(UTC), settings.gps_stale_after_s)
+    persist_decision(session, incident.id, "AMBULANCE_MATCH", "ambulance-v1", settings.config_version, [{"candidate_id": item.code, "eligible": item.eligible, "score": item.score, "rank": item.rank, "reasons": list(item.reasons)} for item in result], {"gps": settings.gps_stale_after_s}, input_snapshot={"incident_id": str(incident.id), "required": sorted(required), "preferred": sorted(preferred)}, commit=False)
     if not any(item.eligible for item in result):
         incident.status = IncidentStatus.ESCALATED
         audit(session, None, "AMBULANCE_MATCH_ESCALATED", "incident", str(incident.id))
@@ -149,8 +164,12 @@ def confirm_ambulance(session: Session, actor: User, ambulance_id: UUID, inciden
     ambulance = session.get(Ambulance, ambulance_id)
     if not incident or not ambulance:
         raise ApiError(404, ErrorCode.NOT_FOUND, "Incident or ambulance not found.")
-    if ambulance.status != "AVAILABLE":
+    recommendations = match_ambulances(session, incident_id, get_settings())
+    selected = next((item for item in recommendations if item["ambulance_id"] == str(ambulance_id)), None)
+    if selected is None or not selected["eligible"]:
         raise ApiError(409, ErrorCode.CONFLICT, "Ambulance is not eligible.")
+    if selected["rank"] != 1 and not override_reason:
+        raise ApiError(422, ErrorCode.VALIDATION_ERROR, "Override reason is required for a non-top recommendation.")
     sequence = session.query(Mission).count() + 1
     assignment = AmbulanceAssignment(incident_id=incident_id, ambulance_id=ambulance_id, status="ASSIGNED", idempotency_key=key, assigned_by=actor.id)
     mission = Mission(mission_code=f"MSN-{sequence:06d}", incident_id=incident_id, ambulance_id=ambulance_id, status=MissionStatus.ASSIGNED, state_version=1)
@@ -158,6 +177,8 @@ def confirm_ambulance(session: Session, actor: User, ambulance_id: UUID, inciden
     ambulance.status = "DISPATCHED"
     incident.status = IncidentStatus.DISPATCHED
     audit(session, actor.id, "AMBULANCE_CONFIRMED", "mission", mission.mission_code)
+    if override_reason:
+        audit(session, actor.id, "AMBULANCE_OVERRIDE", "mission", mission.mission_code, {"reason": override_reason})
     queue_event(session, "mission.assigned", mission.id, mission.state_version, {"mission_id": str(mission.id), "incident_id": str(incident_id), "ambulance_id": str(ambulance_id)})
     session.commit()
     return mission
@@ -170,7 +191,10 @@ def calculate_route(session: Session, incident_id: UUID, hospital_id: UUID | Non
         raise ApiError(404, ErrorCode.NOT_FOUND, "Incident not found.")
     if hospital_id and not hospital:
         raise ApiError(404, ErrorCode.NOT_FOUND, "Hospital not found.")
-    route = Route(incident_id=incident_id, provider="mock", distance_m=6000, duration_seconds=600, traffic_duration_seconds=600, confidence=0.95, fallback_used=False, origin=WKTElement(f"POINT({incident.longitude} {incident.latitude})", srid=4326), destination=WKTElement(f"POINT({hospital.longitude} {hospital.latitude})", srid=4326) if hospital else None)
+    if hospital is None:
+        raise ApiError(409, ErrorCode.ROUTING_PROVIDER_ERROR, "A hospital destination is required for route calculation.")
+    estimate = RoutingService().calculate(golden_scenario(session), incident.incident_code, hospital.hospital_code)
+    route = Route(incident_id=incident_id, provider=estimate.provider, distance_m=estimate.distance_m, duration_seconds=estimate.duration_seconds, traffic_duration_seconds=estimate.traffic_duration_seconds, confidence=estimate.confidence, fallback_used=estimate.fallback_used, origin=WKTElement(f"POINT({incident.longitude} {incident.latitude})", srid=4326), destination=WKTElement(f"POINT({hospital.longitude} {hospital.latitude})", srid=4326))
     session.add(route)
     queue_event(session, "mission.route.updated", route.id, 1, {"incident_id": str(incident_id), "route_id": str(route.id)})
     session.commit()
@@ -197,14 +221,21 @@ def match_hospitals(session: Session, incident_id: UUID) -> list[dict]:
     requirements = list(session.scalars(select(PatientRequirement).where(PatientRequirement.incident_id == incident_id)))
     required = {item.requirement_code for item in requirements if item.level == "REQUIRED"}
     preferred = {item.requirement_code for item in requirements if item.level == "PREFERRED"}
+    now = datetime.now(UTC)
     resource_codes = {resource.resource_type for resource in session.scalars(select(HospitalResource))}
     hospitals = list(session.scalars(select(Hospital).where(Hospital.status == "ACTIVE").order_by(Hospital.hospital_code)))
     decisions = []
     for hospital in hospitals:
+        rejected = session.scalar(select(AcceptanceRequest).where(AcceptanceRequest.incident_id == incident_id, AcceptanceRequest.hospital_id == hospital.id, AcceptanceRequest.status == "REJECTED"))
+        if rejected:
+            continue
         capabilities = {code for code, in session.execute(select(Capability.code).join(HospitalCapability, HospitalCapability.capability_id == Capability.id).where(HospitalCapability.hospital_id == hospital.id, HospitalCapability.status == "ACTIVE"))}
-        resources = {resource.resource_type: resource.available_capacity for resource in session.scalars(select(HospitalResource).where(HospitalResource.hospital_id == hospital.id))}
-        decisions.append(HospitalCandidate(hospital.hospital_code, 600 + int(hospital.hospital_code[-3:]) * 60, frozenset(capabilities), resources))
+        hospital_resources = list(session.scalars(select(HospitalResource).where(HospitalResource.hospital_id == hospital.id)))
+        resources = {resource.resource_type: resource.available_capacity for resource in hospital_resources}
+        stale_resources = frozenset(resource.resource_type for resource in hospital_resources if resource.last_updated_at is None or (now - resource.last_updated_at).total_seconds() > get_settings().resource_stale_after_s)
+        decisions.append(HospitalCandidate(hospital.hospital_code, RoutingService().hospital_eta(golden_scenario(session), hospital.hospital_code), frozenset(capabilities), resources, stale_resources=stale_resources))
     result = evaluate_hospitals(decisions, required, preferred, required & resource_codes)
+    persist_decision(session, incident.id, "HOSPITAL_MATCH", "hospital-v1", get_settings().config_version, [{"candidate_id": item.code, "eligible": item.eligible, "score": item.score, "rank": item.rank, "reasons": list(item.reasons)} for item in result], {"resource_stale_after_s": get_settings().resource_stale_after_s}, input_snapshot={"incident_id": str(incident.id), "required": sorted(required), "preferred": sorted(preferred)}, commit=False)
     if not any(item.eligible for item in result):
         incident.status = IncidentStatus.ESCALATED
         session.commit()
@@ -227,6 +258,8 @@ def hold_acceptance(session: Session, actor: User, incident_id: UUID, hospital_i
     requirements = list(session.scalars(select(PatientRequirement).where(PatientRequirement.incident_id == incident_id, PatientRequirement.level == "REQUIRED")))
     wanted = {item.requirement_code for item in requirements}
     capacity = [resource for resource in resources if resource.resource_type in wanted]
+    if len(capacity) != len(wanted):
+        raise ApiError(409, ErrorCode.MISSING_CAPABILITY, "A required resource is not available at this hospital.")
     if any(resource.status != "ACTIVE" or resource.available_capacity is None or resource.available_capacity < 1 or not resource.last_updated_at or (datetime.now(UTC) - resource.last_updated_at).total_seconds() > settings.resource_stale_after_s for resource in capacity):
         raise ApiError(409, ErrorCode.RESOURCE_UNAVAILABLE, "Required resource cannot be held.")
     expires = datetime.now(UTC) + timedelta(seconds=settings.reservation_hold_ttl_s)
@@ -263,6 +296,8 @@ def accept_request(session: Session, actor: User, request_id: UUID, key: str) ->
             return request
         raise ApiError(409, ErrorCode.CONFLICT, "Acceptance request is closed.")
     if request.expires_at <= datetime.now(UTC):
+        for reservation in session.scalars(select(Reservation).where(Reservation.acceptance_request_id == request.id, Reservation.status == "HELD").with_for_update()):
+            ReservationService(session).expire_in_transaction(reservation.id)
         request.status = "EXPIRED"
         session.commit()
         raise ApiError(409, ErrorCode.RESOURCE_UNAVAILABLE, "Acceptance hold expired.")
@@ -273,6 +308,12 @@ def accept_request(session: Session, actor: User, request_id: UUID, key: str) ->
     incident = session.get(Incident, request.incident_id)
     if incident:
         incident.status = IncidentStatus.RESOURCE_RESERVED
+        mission = session.scalar(select(Mission).where(Mission.incident_id == incident.id).with_for_update())
+        if mission:
+            mission.selected_hospital_id = request.hospital_id
+            mission.state_version += 1
+            session.add(MissionEvent(mission_id=mission.id, incident_id=incident.id, event_type="DESTINATION_CHANGED", payload={"to_hospital_id": str(request.hospital_id)}, actor_id=actor.id))
+            session.add(Notification(incident_id=incident.id, event_type="DESTINATION_CHANGED", payload={"mission_id": str(mission.id), "hospital_id": str(request.hospital_id)}))
     audit(session, actor.id, "HOSPITAL_ACCEPTED", "acceptance_request", str(request.id))
     queue_event(session, "hospital.accepted", request.id, 1, {"incident_id": str(request.incident_id), "hospital_id": str(request.hospital_id)})
     session.commit()

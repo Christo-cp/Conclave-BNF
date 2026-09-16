@@ -32,6 +32,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(30), default="ACTIVE")
     hospital_id: Mapped[UUID | None] = mapped_column(ForeignKey("hospitals.id"), nullable=True)
+    ambulance_id: Mapped[UUID | None] = mapped_column(ForeignKey("ambulances.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
     roles: Mapped[list["Role"]] = relationship(back_populates="users", secondary="user_roles")
@@ -152,6 +153,20 @@ class HospitalResource(Base):
     version: Mapped[int] = mapped_column(Integer, default=1)
 
 
+class ResourceEvent(Base):
+    __tablename__ = "resource_events"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    hospital_resource_id: Mapped[UUID] = mapped_column(ForeignKey("hospital_resources.id"))
+    event_type: Mapped[str] = mapped_column(String(50))
+    old_available: Mapped[int | None] = mapped_column(Integer)
+    new_available: Mapped[int | None] = mapped_column(Integer)
+    old_reserved: Mapped[int | None] = mapped_column(Integer)
+    new_reserved: Mapped[int | None] = mapped_column(Integer)
+    source: Mapped[str] = mapped_column(String(50))
+    actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
 class AmbulanceAssignment(Base):
     __tablename__ = "ambulance_assignments"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -227,6 +242,9 @@ class DecisionRun(Base):
     algorithm_version: Mapped[str] = mapped_column(String(50))
     config_version: Mapped[str] = mapped_column(String(50))
     data_freshness: Mapped[dict] = mapped_column(JSON, default=dict)
+    trigger: Mapped[str | None] = mapped_column(String(60))
+    input_snapshot: Mapped[dict | None] = mapped_column(JSON)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
@@ -250,7 +268,7 @@ class DecisionReason(Base):
 
 class MissionEvent(Base):
     __tablename__ = "mission_events"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     mission_id: Mapped[UUID] = mapped_column(ForeignKey("missions.id"))
     incident_id: Mapped[UUID] = mapped_column(ForeignKey("incidents.id"))
     event_type: Mapped[str] = mapped_column(String(60))
@@ -265,6 +283,19 @@ class Notification(Base):
     incident_id: Mapped[UUID] = mapped_column(ForeignKey("incidents.id"))
     event_type: Mapped[str] = mapped_column(String(60))
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class SimulationScenario(Base):
+    __tablename__ = "simulation_scenarios"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    scenario_code: Mapped[str] = mapped_column(String(50), unique=True)
+    name: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(Text)
+    initial_state: Mapped[dict] = mapped_column(JSON, default=dict)
+    configuration: Mapped[dict] = mapped_column(JSON, default=dict)
+    seed: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(30))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 

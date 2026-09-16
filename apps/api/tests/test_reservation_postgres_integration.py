@@ -276,7 +276,7 @@ def test_s7_s12_migration_roundtrip_in_isolated_database(test_settings):
         command.downgrade(config, "0001_mvp_schema")
         command.upgrade(config, "head")
         with database_engine.connect() as connection:
-            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0015_simulation_integrity"
+            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0018_decision_trace_fields"
     finally:
         database_engine.dispose()
         with admin_engine.connect() as connection:

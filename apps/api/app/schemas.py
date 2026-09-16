@@ -34,10 +34,12 @@ class LocationUpdate(BaseModel):
 class AmbulanceUpdate(BaseModel):
     vehicle_type: str | None = Field(default=None, min_length=1, max_length=50)
     status: str | None = None
+    version: int
 
 
 class AmbulanceStatusUpdate(BaseModel):
     status: str
+    version: int
 
 
 class HospitalUpdate(BaseModel):
@@ -58,10 +60,12 @@ class ResourceUpdate(BaseModel):
     total_capacity: int | None = Field(default=None, ge=0)
     available_capacity: int | None = Field(default=None, ge=0)
     status: str | None = None
+    version: int
 
 
 class ResourceStatusUpdate(BaseModel):
     status: str
+    version: int
 
 
 class ReservationCreate(BaseModel):
@@ -83,6 +87,10 @@ class MatchRequest(BaseModel):
 class ConfirmAmbulanceRequest(BaseModel):
     incident_id: UUID
     override_reason: str | None = None
+
+
+class AssignmentResponse(BaseModel):
+    accepted: bool
 
 
 class RouteRequest(BaseModel):

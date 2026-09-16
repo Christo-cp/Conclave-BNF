@@ -1,3 +1,5 @@
+import asyncio
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
@@ -23,29 +25,41 @@ async def websocket_endpoint(websocket: WebSocket, token: Annotated[str | None, 
     subscription = None
     try:
         while True:
-            message = await websocket.receive_json()
-            if message.get("action") != "subscribe":
-                await websocket.send_json({"error": "Only subscribe is supported."})
+            if subscription is None:
+                message = await websocket.receive_json()
+                if message.get("action") != "subscribe":
+                    await websocket.send_json({"error": "Subscribe before sending commands."})
+                    continue
+                channels = {str(channel) for channel in message.get("channels", [])}
+                if not channels:
+                    await websocket.close(code=4400)
+                    return
+                if not all(can_subscribe(user, channel) for channel in channels):
+                    await websocket.close(code=4403)
+                    return
+                subscription = broker.subscribe(channels)
+                await websocket.send_json({"event": "connected", "channels": sorted(channels)})
                 continue
-            channels = {str(channel) for channel in message.get("channels", [])}
-            if not all(can_subscribe(user, channel) for channel in channels):
-                await websocket.close(code=4403)
-                return
-            if subscription:
-                broker.unsubscribe(subscription)
-            subscription = broker.subscribe(channels)
-            await websocket.send_json({"event": "connected", "channels": sorted(channels)})
-            receive_task = websocket.receive_json()
-            event_task = subscription.queue.get()
-            done, pending = await __import__("asyncio").wait(
-                {__import__("asyncio").create_task(receive_task), __import__("asyncio").create_task(event_task)},
-                return_when=__import__("asyncio").FIRST_COMPLETED,
-            )
+            receive_task = asyncio.create_task(websocket.receive_json())
+            event_task = asyncio.create_task(subscription.queue.get())
+            done, pending = await asyncio.wait({receive_task, event_task}, timeout=30, return_when=asyncio.FIRST_COMPLETED)
             for task in pending:
                 task.cancel()
+            if not done:
+                await websocket.send_json({"event": "heartbeat", "timestamp": datetime.now(UTC).isoformat()})
+                continue
             result = done.pop().result()
             if isinstance(result, dict):
-                await websocket.send_json({"event": "heartbeat", "timestamp": __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat()})
+                if result.get("action") != "subscribe":
+                    await websocket.send_json({"error": "Only subscribe is supported."})
+                    continue
+                channels = {str(channel) for channel in result.get("channels", [])}
+                if not channels or not all(can_subscribe(user, channel) for channel in channels):
+                    await websocket.close(code=4403)
+                    return
+                broker.unsubscribe(subscription)
+                subscription = broker.subscribe(channels)
+                await websocket.send_json({"event": "connected", "channels": sorted(channels)})
             else:
                 await websocket.send_json(result.as_dict())
     except WebSocketDisconnect:

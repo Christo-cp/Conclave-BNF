@@ -13,6 +13,10 @@ def persist_decision(
     config_version: str,
     candidates: list[dict],
     freshness: dict | None = None,
+    trigger: str = "MATCH",
+    input_snapshot: dict | None = None,
+    duration_ms: int | None = None,
+    commit: bool = True,
 ) -> DecisionRun:
     run = DecisionRun(
         incident_id=incident_id,
@@ -20,6 +24,9 @@ def persist_decision(
         algorithm_version=algorithm_version,
         config_version=config_version,
         data_freshness=freshness or {},
+        trigger=trigger,
+        input_snapshot=input_snapshot,
+        duration_ms=duration_ms,
     )
     session.add(run)
     session.flush()
@@ -34,6 +41,11 @@ def persist_decision(
         session.add(candidate)
         session.flush()
         for reason in item.get("reasons", []):
-            session.add(DecisionReason(decision_candidate_id=candidate.id, code=reason["code"], detail=reason["detail"]))
-    session.commit()
+            if isinstance(reason, str):
+                code, detail = reason, reason
+            else:
+                code, detail = reason["code"], reason["detail"]
+            session.add(DecisionReason(decision_candidate_id=candidate.id, code=code, detail=detail))
+    if commit:
+        session.commit()
     return run

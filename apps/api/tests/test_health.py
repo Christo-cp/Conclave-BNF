@@ -30,7 +30,7 @@ def test_health_db_up(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "connectivity": "ok",
-            "migration_version": "0015_simulation_integrity",
+            "migration_version": "0018_decision_trace_fields",
         "simple_query": 1,
     }
     assert response.headers["X-Request-ID"].startswith("req_")

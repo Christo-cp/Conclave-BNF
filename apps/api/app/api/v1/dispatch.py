@@ -5,10 +5,12 @@ from fastapi import APIRouter, Depends, Header
 from sqlalchemy import select
 
 from app.acceptance_service import get_request, reject_request
+from app.assignment_service import respond_to_assignment
 from app.core.config import Settings, get_settings
+from app.core.enums import Role
 from app.core.errors import ApiError, ErrorCode
-from app.db.models import AcceptanceRequest, Reservation
-from app.dependencies import CurrentUser, Db
+from app.db.models import AcceptanceRequest, AmbulanceAssignment, Reservation, User
+from app.dependencies import CurrentUser, Db, require_roles
 from app.reservation_service import ReservationService
 from app.schemas import (
     AcceptanceCreate,
@@ -30,6 +32,9 @@ from app.services import (
 )
 
 router = APIRouter(tags=["dispatch"])
+Dispatcher = Annotated[User, Depends(require_roles(Role.DISPATCHER, Role.SYSTEM_ADMIN))]
+HospitalResponder = Annotated[User, Depends(require_roles(Role.HOSPITAL_STAFF, Role.HOSPITAL_ADMIN, Role.SYSTEM_ADMIN))]
+ReservationUser = Annotated[User, Depends(require_roles(Role.HOSPITAL_STAFF, Role.HOSPITAL_ADMIN, Role.SYSTEM_ADMIN))]
 
 
 def reservation_json(item: Reservation) -> dict:
@@ -54,44 +59,60 @@ def assert_hospital_response_role(user) -> None:
 
 
 @router.post("/dispatch/ambulances/match")
-def ambulance_match(payload: MatchRequest, session: Db, _: CurrentUser, settings: Annotated[Settings, Depends(get_settings)]):
+def ambulance_match(payload: MatchRequest, session: Db, _: Dispatcher, settings: Annotated[Settings, Depends(get_settings)]):
     return match_ambulances(session, payload.incident_id, settings)
 
 
 @router.post("/dispatch/ambulances/{ambulance_id}/confirm")
-def ambulance_confirm(ambulance_id: UUID, payload: ConfirmAmbulanceRequest, session: Db, user: CurrentUser, idempotency_key: Annotated[str, Header(alias="Idempotency-Key")]):
+def ambulance_confirm(ambulance_id: UUID, payload: ConfirmAmbulanceRequest, session: Db, user: Dispatcher, idempotency_key: Annotated[str, Header(alias="Idempotency-Key")]):
     return confirm_ambulance(session, user, ambulance_id, payload.incident_id, idempotency_key, payload.override_reason)
 
 
+@router.post("/ambulance-assignments/{assignment_id}/accept")
+def accept_assignment(assignment_id: UUID, session: Db, user: Annotated[User, Depends(require_roles(Role.AMBULANCE_CREW, Role.SYSTEM_ADMIN))]):
+    assignment = session.get(AmbulanceAssignment, assignment_id)
+    if assignment is None or (Role.AMBULANCE_CREW.value in {role.code for role in user.roles} and user.ambulance_id != assignment.ambulance_id):
+        raise ApiError(403, ErrorCode.AUTHORIZATION_ERROR, "Ambulance assignment scope denied.")
+    return respond_to_assignment(session, user.id, assignment_id, True)
+
+
+@router.post("/ambulance-assignments/{assignment_id}/reject")
+def reject_assignment(assignment_id: UUID, session: Db, user: Annotated[User, Depends(require_roles(Role.AMBULANCE_CREW, Role.SYSTEM_ADMIN))]):
+    assignment = session.get(AmbulanceAssignment, assignment_id)
+    if assignment is None or (Role.AMBULANCE_CREW.value in {role.code for role in user.roles} and user.ambulance_id != assignment.ambulance_id):
+        raise ApiError(403, ErrorCode.AUTHORIZATION_ERROR, "Ambulance assignment scope denied.")
+    return respond_to_assignment(session, user.id, assignment_id, False)
+
+
 @router.post("/routes/calculate")
-def route(payload: RouteRequest, session: Db, _: CurrentUser):
+def route(payload: RouteRequest, session: Db, _: Dispatcher):
     return route_json(calculate_route(session, payload.incident_id, payload.hospital_id))
 
 
 @router.post("/dispatch/hospitals/match")
-def hospital_match(payload: MatchRequest, session: Db, _: CurrentUser):
+def hospital_match(payload: MatchRequest, session: Db, _: Dispatcher):
     return match_hospitals(session, payload.incident_id)
 
 
 @router.post("/acceptance-requests")
-def acceptance(payload: AcceptanceCreate, session: Db, user: CurrentUser, settings: Annotated[Settings, Depends(get_settings)], idempotency_key: Annotated[str, Header(alias="Idempotency-Key")]):
+def acceptance(payload: AcceptanceCreate, session: Db, user: Dispatcher, settings: Annotated[Settings, Depends(get_settings)], idempotency_key: Annotated[str, Header(alias="Idempotency-Key")]):
     return hold_acceptance(session, user, payload.incident_id, payload.hospital_id, idempotency_key, settings)
 
 
 @router.post("/acceptance-requests/{request_id}/accept")
-def accept(request_id: UUID, session: Db, user: CurrentUser, idempotency_key: Annotated[str, Header(alias="Idempotency-Key")]):
+def accept(request_id: UUID, session: Db, user: HospitalResponder, idempotency_key: Annotated[str, Header(alias="Idempotency-Key")]):
     return accept_request(session, user, request_id, idempotency_key)
 
 
 @router.get("/acceptance-requests/{request_id}")
-def acceptance_get(request_id: UUID, session: Db, _: CurrentUser):
+def acceptance_get(request_id: UUID, session: Db, _: HospitalResponder):
     request = get_request(session, request_id)
     assert_hospital_scope(_, request.hospital_id)
     return acceptance_json(request)
 
 
 @router.post("/acceptance-requests/{request_id}/reject")
-def reject(request_id: UUID, payload: AcceptanceReject, session: Db, user: CurrentUser):
+def reject(request_id: UUID, payload: AcceptanceReject, session: Db, user: HospitalResponder):
     request = get_request(session, request_id)
     assert_hospital_response_role(user)
     assert_hospital_scope(user, request.hospital_id)
@@ -99,7 +120,7 @@ def reject(request_id: UUID, payload: AcceptanceReject, session: Db, user: Curre
 
 
 @router.post("/reservations")
-def create_reservation(payload: ReservationCreate, session: Db, user: CurrentUser, idempotency_key: Annotated[str, Header(alias="Idempotency-Key")]):
+def create_reservation(payload: ReservationCreate, session: Db, user: ReservationUser, idempotency_key: Annotated[str, Header(alias="Idempotency-Key")]):
     assert_hospital_scope(user, payload.hospital_id)
     existing = session.scalar(select(Reservation).where(Reservation.idempotency_key == idempotency_key))
     if existing:
