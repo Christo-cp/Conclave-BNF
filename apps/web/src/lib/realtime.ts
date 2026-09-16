@@ -21,11 +21,13 @@ export class RealtimeClient {
   private readonly url: string
   private readonly listener: Listener
   private readonly resync: () => Promise<void>
+  private readonly channels: string[]
 
-  constructor(url: string, listener: Listener, resync: () => Promise<void>) {
+  constructor(url: string, listener: Listener, resync: () => Promise<void>, channels: string[] = ['dispatcher:all']) {
     this.url = url
     this.listener = listener
     this.resync = resync
+    this.channels = channels
   }
 
   connect() {
@@ -44,7 +46,7 @@ export class RealtimeClient {
     if (this.stopped) return
     try {
       this.socket = new WebSocket(this.url)
-       this.socket.onopen = () => { this.retry = 0; this.socket?.send(JSON.stringify({ action: 'subscribe', channels: ['dispatcher:all'] })) }
+       this.socket.onopen = () => { this.retry = 0; this.socket?.send(JSON.stringify({ action: 'subscribe', channels: this.channels })) }
       this.socket.onmessage = (message) => this.receive(message.data)
       this.socket.onclose = () => this.reconnect()
       this.socket.onerror = () => this.socket?.close()
