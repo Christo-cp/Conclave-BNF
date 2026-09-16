@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     eta_cap_s: int = 3600
     routing_provider: str = "mock"
     config_version: str = "mvp-1"
+    cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
+    sweeper_interval_s: int = 5
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
 
 @lru_cache

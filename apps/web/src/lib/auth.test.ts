@@ -10,6 +10,10 @@ describe('JWT role parsing', () => {
     expect(auth?.demoFallback).toBe(false)
     expect(rolePath(auth?.role ?? null)).toBe('/hospital')
   })
+  it('maps canonical backend hospital roles to the hospital workspace', () => {
+    expect(getAuthContext(token({ roles: ['HOSPITAL_STAFF'] }))?.role).toBe('HOSPITAL')
+    expect(getAuthContext(token({ roles: ['HOSPITAL_ADMIN'] }))?.role).toBe('HOSPITAL')
+  })
   it('labels missing roles as demo fallback', () => {
     expect(getAuthContext(token({ sub: 'demo' }))?.demoFallback).toBe(true)
   })

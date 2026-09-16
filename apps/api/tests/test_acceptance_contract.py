@@ -38,6 +38,6 @@ def test_acceptance_retry_uses_creation_key_and_updates_destination(db_session, 
 
     key = uuid4().hex
     request = hold_acceptance(db_session, user, incident.id, hospital.id, key, test_settings)
-    accepted = accept_request(db_session, user, request.id, key)
-    retried = accept_request(db_session, user, request.id, key)
+    accepted = accept_request(db_session, user, request.id, uuid4().hex)
+    retried = accept_request(db_session, user, request.id, uuid4().hex)
     assert accepted.status == retried.status == "ACCEPTED"

@@ -22,7 +22,7 @@ export class ApiError extends Error {
 }
 
 const TOKEN_KEY = 'conclave_access_token'
-async function request<T>(path: string, init?: RequestInit): Promise<T> { const headers = new Headers(init?.headers); headers.set('Content-Type', 'application/json'); const token = api.getToken(); if (token) headers.set('Authorization', `Bearer ${token}`); const response = await fetch(`/api/v1${path}`, { ...init, headers }); const body = await response.json().catch(() => null) as { detail?: string; message?: string } | null; if (!response.ok) throw new ApiError(response.status, body?.detail ?? body?.message ?? `Request failed (${response.status})`); return body as T }
+async function request<T>(path: string, init?: RequestInit): Promise<T> { const headers = new Headers(init?.headers); headers.set('Content-Type', 'application/json'); const token = api.getToken(); if (token) headers.set('Authorization', `Bearer ${token}`); const response = await fetch(`/api/v1${path}`, { ...init, headers }); const body = await response.json().catch(() => null) as { detail?: string; message?: string; error?: { message?: string } } | null; if (response.status === 401) { api.clearToken(); window.dispatchEvent(new Event('conclave:auth-expired')) } if (!response.ok) throw new ApiError(response.status, body?.error?.message ?? body?.detail ?? body?.message ?? `Request failed (${response.status})`); return body as T }
 function idempotencyKey() { return `web-${crypto.randomUUID()}` }
 
 export const api = {

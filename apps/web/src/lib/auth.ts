@@ -10,6 +10,8 @@ export type AuthContext = {
 const ROLE_ALIASES: Record<string, Role> = {
   dispatcher: 'DISPATCHER',
   hospital: 'HOSPITAL',
+  hospital_staff: 'HOSPITAL',
+  hospital_admin: 'HOSPITAL',
   ambulance: 'AMBULANCE_CREW',
   ambulance_crew: 'AMBULANCE_CREW',
   crew: 'AMBULANCE_CREW',
